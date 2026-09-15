@@ -1,0 +1,113 @@
+html:root .settings-preview-layout {
+  --miku-control-bg: color-mix(in srgb, var(--te-card-bg) 92%, transparent);
+  --miku-control-line: color-mix(in srgb, var(--te-primary-500) 24%, var(--te-card-border));
+  --miku-control-glow: color-mix(in srgb, var(--te-primary-500) 14%, transparent);
+}
+
+html:root
+  .settings-preview-layout
+  :is(.glass-card.preview-section, .device-panel, .dsp-module-card) {
+  background: color-mix(in srgb, var(--te-card-bg) 94%, transparent) !important;
+  border-color: var(--miku-control-line) !important;
+  box-shadow:
+    inset 0 1px 0 var(--miku-control-bg),
+    0 6px 22px var(--miku-control-glow) !important;
+}
+
+html:root .settings-preview-layout :is(.soft-button, .muted-button, .icon-button, .dashed-button) {
+  border-radius: 12px;
+  background: var(--miku-control-bg) !important;
+  border-color: var(--miku-control-line) !important;
+  color: var(--te-neutral-900) !important;
+  box-shadow: inset 0 0 0 1px var(--miku-control-line) !important;
+}
+
+html:root .settings-preview-layout .brand-soft-button {
+  border-radius: 12px;
+  color: var(--te-primary-400) !important;
+  background: var(--te-active-bg) !important;
+  box-shadow: inset 0 0 0 1px var(--miku-control-line) !important;
+}
+
+html:root
+  .settings-preview-layout
+  :is(.soft-button, .muted-button, .icon-button, .dashed-button, .brand-soft-button):not(
+    :disabled
+  ):not([aria-disabled='true']):hover {
+  background: var(--te-active-bg) !important;
+  color: var(--te-primary-400) !important;
+  box-shadow:
+    inset 0 0 0 1px var(--te-primary-500),
+    0 2px 8px var(--miku-control-glow) !important;
+}
+
+html:root
+  .settings-preview-layout
+  :is(.select-control, .number-input, .path-control input, .color-picker) {
+  border-radius: 10px;
+  color: var(--te-neutral-900) !important;
+  background: var(--miku-control-bg) !important;
+  border-color: var(--miku-control-line) !important;
+}
+
+html:root .settings-preview-layout select option {
+  background: var(--te-card-bg);
+  color: var(--te-neutral-900);
+}
+
+html:root .settings-preview-layout :is(.segmented-control, .theme-segment, .folder-chip) {
+  background: color-mix(in srgb, var(--te-subtle-bg) 90%, transparent) !important;
+  border-color: var(--miku-control-line) !important;
+  color: var(--te-neutral-900) !important;
+  box-shadow: none !important;
+}
+
+html:root .settings-preview-layout :is(.segmented-control, .theme-segment) button {
+  color: var(--te-neutral-500) !important;
+}
+
+html:root .settings-preview-layout :is(.segmented-control, .theme-segment) button.active {
+  color: var(--te-primary-400) !important;
+  background: var(--te-active-bg) !important;
+  box-shadow: inset 0 0 0 1px var(--miku-control-line) !important;
+}
+
+html:root .settings-preview-layout .toggle-switch.inactive {
+  background: var(--te-card-border) !important;
+  box-shadow: inset 0 0 0 1px var(--te-neutral-500) !important;
+}
+
+html:root .settings-preview-layout .toggle-switch.active {
+  background: var(--te-primary-500) !important;
+  box-shadow: 0 0 0 3px var(--miku-control-glow) !important;
+}
+
+html:root .settings-preview-layout .toggle-switch::after {
+  background: var(--miku-on-accent) !important;
+}
+
+html:root .settings-preview-layout .range-slider {
+  background: var(--te-card-border) !important;
+}
+
+html:root .settings-preview-layout .range-slider::-webkit-slider-thumb {
+  background: var(--te-primary-500) !important;
+  border-color: var(--miku-on-accent) !important;
+  box-shadow: 0 0 0 3px var(--miku-control-glow);
+}
+
+html:root .settings-preview-layout input[type='checkbox'] {
+  accent-color: var(--te-primary-500);
+}
+
+html:root .settings-preview-layout :is(button, input, select, [role='switch']):focus-visible {
+  outline: 2px solid var(--te-primary-500) !important;
+  outline-offset: 3px;
+}
+
+html:root .settings-preview-layout :is(button, input, select):disabled,
+html:root .settings-preview-layout .toggle-switch.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none !important;
+}

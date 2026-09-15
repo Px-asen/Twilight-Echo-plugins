@@ -1,0 +1,29 @@
+html {
+  --miku-on-accent: #ffffff;
+}
+
+html[data-theme='dark'] {
+  --miku-on-accent: #102429;
+}
+
+html:root body:has(.app-shell) :is(.stream-action-btn, .search-tab-pill.active) {
+  background: var(--te-primary-500);
+  color: var(--miku-on-accent);
+}
+
+html:root body:has(.app-shell) .plugin-page .discover-banner {
+  background: var(--te-active-bg);
+  color: var(--te-neutral-900);
+}
+
+html:root body:has(.app-shell) .track-row:hover {
+  background: var(--te-library-row-hover);
+}
+
+html:root body:has(.app-shell) .btn-like.liked {
+  color: var(--te-favorite-500);
+}
+
+html:root body:has(.app-shell) .btn-like.liked:hover {
+  background: color-mix(in srgb, var(--te-favorite-500) 12%, transparent);
+}

@@ -108,6 +108,16 @@ API host or third-party proxy. The plugin requires an explicit disclaimer
 acknowledgement before it makes requests. See
 `plugins/kugou-provider/README.md` for setup and limitations.
 
+### Miku Navigation Theme (Local Preview)
+
+Plugin id: `com.twilightecho.theme.miku-navigation`
+
+A declarative theme that replaces 30 main, settings, and streaming navigation
+icons with user-supplied Hatsune Miku artwork. Source and installation instructions are in
+[`plugins/miku-navigation/README.md`](plugins/miku-navigation/README.md).
+Preview packages are kept under `packages/local-preview/` and are not included
+in the marketplace index.
+
 ## Build And Test
 
 The pack script reuses the Twilight Echo app repository tooling. By default it

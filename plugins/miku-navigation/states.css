@@ -1,0 +1,59 @@
+html:root .settings-preview-layout #general > .section-title-row::after,
+html:root .settings-preview-layout #playback > .section-title-row::after {
+  content: '';
+  display: block;
+  width: 72px;
+  height: 64px;
+  flex: 0 0 72px;
+  margin-left: auto;
+  background: var(--miku-state-peek) center / contain no-repeat;
+  pointer-events: none;
+}
+
+html:root .settings-preview-layout #playback > .section-title-row::after {
+  background-image: var(--miku-state-listening);
+}
+
+html:root :is(.song-list .empty-state, .streaming-page .library-view .empty-state)::before,
+html:root .home .empty-stage::before,
+html:root .streaming-page .search-view .streaming-placeholder:has(> .pi-search)::before {
+  content: '';
+  display: block;
+  position: relative;
+  width: 144px;
+  height: 144px;
+  flex: 0 0 auto;
+  margin: 0 auto 12px;
+  background: var(--miku-state-empty) center / contain no-repeat;
+  pointer-events: none;
+}
+
+html:root .streaming-page .search-view .streaming-placeholder:has(> .pi-search)::before {
+  background-image: var(--miku-state-thinking);
+}
+
+html:root :is(.song-list .empty-state, .streaming-page .library-view .empty-state) > .empty-icon,
+html:root .home .empty-stage > .empty-badge,
+html:root .streaming-page .search-view .streaming-placeholder > .pi-search {
+  display: none;
+}
+
+html:root .settings-preview-layout .library-scan-copy.success-copy::before {
+  content: '';
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  margin-right: 8px;
+  vertical-align: middle;
+  background: var(--miku-state-done) center / contain no-repeat;
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  html:root :is(.song-list .empty-state, .streaming-page .library-view .empty-state)::before,
+  html:root .home .empty-stage::before,
+  html:root .streaming-page .search-view .streaming-placeholder:has(> .pi-search)::before {
+    width: 112px;
+    height: 112px;
+  }
+}

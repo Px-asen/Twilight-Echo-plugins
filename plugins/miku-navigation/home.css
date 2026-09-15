@@ -1,0 +1,73 @@
+html :is(.home .feature-card, .streaming-page .home-view .hero) {
+  --miku-hero-size: 72%;
+  --miku-hero-x: 70%;
+  --miku-hero-y: 12%;
+  --miku-hero-opacity: 0.96;
+  --miku-hero-mask: 22%;
+  --miku-hero-filter: none;
+}
+
+html
+  :is(.home .feature-card, .streaming-page .home-view .hero)
+  :is(.feature-backdrop, .hero-ambient)
+  > img {
+  visibility: hidden;
+}
+
+html
+  :is(.home .feature-card, .streaming-page .home-view .hero)
+  :is(.feature-backdrop, .hero-ambient)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--miku-hero-image);
+  background-repeat: no-repeat;
+  background-size: var(--miku-hero-size) auto;
+  background-position: var(--miku-hero-x) var(--miku-hero-y);
+  opacity: var(--miku-hero-opacity);
+  filter: var(--miku-hero-filter);
+}
+
+html
+  :is(.home .feature-card, .streaming-page .home-view .hero)
+  :is(.feature-backdrop, .hero-ambient)::after {
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      var(--te-card-bg) 0%,
+      var(--te-card-bg) var(--miku-hero-mask),
+      transparent 60%
+    ),
+    linear-gradient(0deg, var(--te-card-bg), transparent 24%),
+    linear-gradient(270deg, var(--te-card-bg) 4%, transparent 22%) !important;
+}
+
+html[data-theme='dark'] :is(.home .feature-card, .streaming-page .home-view .hero) {
+  --miku-hero-filter: brightness(0.72) saturate(0.8);
+}
+
+@media (max-width: 900px) {
+  html :is(.home .feature-card, .streaming-page .home-view .hero) {
+    --miku-hero-size: auto 100%;
+    --miku-hero-x: 85%;
+    --miku-hero-y: 0%;
+    --miku-hero-opacity: 0.46;
+    --miku-hero-mask: 42%;
+  }
+
+  html
+    :is(.home .feature-card, .streaming-page .home-view .hero)
+    :is(.feature-backdrop, .hero-ambient)::before {
+    background-size: var(--miku-hero-size);
+  }
+
+  html
+    :is(.home .feature-card, .streaming-page .home-view .hero)
+    :is(.feature-backdrop, .hero-ambient)::after {
+    background:
+      linear-gradient(90deg, var(--te-card-bg), transparent 130%),
+      linear-gradient(0deg, var(--te-card-bg), transparent 65%) !important;
+  }
+}

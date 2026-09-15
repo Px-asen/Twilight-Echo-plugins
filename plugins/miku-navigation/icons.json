@@ -1,0 +1,187 @@
+[
+  {
+    "label": "首页",
+    "file": "01_home.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.home']"
+  },
+  {
+    "label": "所有歌曲",
+    "file": "02_all_songs.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.songs']"
+  },
+  {
+    "label": "艺术家",
+    "file": "03_artists.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.artists']"
+  },
+  {
+    "label": "专辑",
+    "file": "04_albums.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.albums']"
+  },
+  {
+    "label": "流派",
+    "file": "05_genres.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.genres']"
+  },
+  {
+    "label": "歌单",
+    "file": "06_playlists.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.playlists']"
+  },
+  {
+    "label": "聚合歌单",
+    "file": "07_smart_playlists.png",
+    "selector": ".side-menu .menu-item[title='聚合歌单'] [data-theme-icon-slot='navigation.playlists']"
+  },
+  {
+    "label": "文件夹",
+    "file": "08_folders.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.folders']"
+  },
+  {
+    "label": "最近播放",
+    "file": "09_recently_played.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.recent']"
+  },
+  {
+    "label": "流媒体",
+    "file": "10_streaming.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.streaming']"
+  },
+  {
+    "label": "电台 / 播客",
+    "file": "11_radio_podcast.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.radio']"
+  },
+  {
+    "label": "网络源",
+    "file": "12_network_sources.png",
+    "selector": ".side-menu .menu-item-network > .item-icon",
+    "legacyGlyph": true
+  },
+  {
+    "label": "导入歌曲",
+    "file": "13_import_songs.png",
+    "selector": ".side-menu [data-theme-icon-slot='navigation.import']"
+  },
+  {
+    "group": "settings",
+    "label": "常规",
+    "file": "settings/01_general.png",
+    "selector": ".settings-preview-nav > .preview-nav-item > .pi-sliders-h",
+    "legacyGlyph": true
+  },
+  {
+    "group": "settings",
+    "label": "播放",
+    "file": "settings/02_playback.png",
+    "selector": ".settings-preview-nav > .preview-nav-item > .pi-volume-up",
+    "legacyGlyph": true
+  },
+  {
+    "group": "settings",
+    "label": "DSP",
+    "file": "settings/03_dsp.png",
+    "selector": ".settings-preview-nav > .preview-nav-item > .pi-sliders-v",
+    "legacyGlyph": true
+  },
+  {
+    "group": "settings",
+    "label": "缓存",
+    "file": "settings/04_cache.png",
+    "selector": ".settings-preview-nav > .preview-nav-item > .pi-database",
+    "legacyGlyph": true
+  },
+  {
+    "group": "settings",
+    "label": "性能",
+    "file": "settings/05_performance.png",
+    "selector": ".settings-preview-nav > .preview-nav-item > .pi-bolt",
+    "legacyGlyph": true
+  },
+  {
+    "group": "settings",
+    "label": "外观",
+    "file": "settings/06_appearance.png",
+    "selector": ".settings-preview-nav > .preview-nav-item > .pi-palette",
+    "legacyGlyph": true
+  },
+  {
+    "group": "settings",
+    "label": "桌面歌词",
+    "file": "settings/07_desktop_lyrics.png",
+    "selector": ".settings-preview-nav > .preview-nav-item > .pi-window-maximize",
+    "legacyGlyph": true
+  },
+  {
+    "group": "settings",
+    "label": "快捷键",
+    "file": "settings/08_shortcuts.png",
+    "selector": ".settings-preview-nav > .preview-nav-item > .pi-key",
+    "legacyGlyph": true
+  },
+  {
+    "group": "settings",
+    "label": "关于",
+    "file": "settings/09_about.png",
+    "selector": ".settings-preview-nav > .preview-nav-item > .pi-info-circle",
+    "legacyGlyph": true
+  },
+  {
+    "group": "streaming",
+    "label": "主页",
+    "file": "streaming/01_home.png",
+    "selector": ".streaming-sidebar .streaming-menu-icon.pi-sparkles",
+    "legacyGlyph": true
+  },
+  {
+    "group": "streaming",
+    "label": "发现歌单",
+    "file": "streaming/02_discover.png",
+    "selector": ".streaming-sidebar .streaming-menu-icon.pi-th-large",
+    "legacyGlyph": true
+  },
+  {
+    "group": "streaming",
+    "label": "音乐库",
+    "file": "streaming/03_library.png",
+    "selector": ".streaming-sidebar .streaming-menu-icon.pi-heart",
+    "legacyGlyph": true
+  },
+  {
+    "group": "streaming",
+    "label": "音乐云盘",
+    "file": "streaming/04_cloud_drive.png",
+    "selector": ".streaming-sidebar .streaming-menu-icon.pi-cloud",
+    "legacyGlyph": true
+  },
+  {
+    "group": "streaming",
+    "label": "最近播放",
+    "file": "streaming/05_recent.png",
+    "selector": ".streaming-sidebar .streaming-menu-icon.pi-history",
+    "legacyGlyph": true
+  },
+  {
+    "group": "streaming",
+    "label": "Bilibili",
+    "file": "streaming/06_bilibili.png",
+    "selector": ".streaming-sidebar .streaming-menu-icon.pi-video",
+    "legacyGlyph": true
+  },
+  {
+    "group": "streaming",
+    "label": "聚合歌单",
+    "file": "streaming/07_smart_playlists.png",
+    "selector": ".streaming-sidebar .streaming-menu-icon.pi-sitemap",
+    "legacyGlyph": true
+  },
+  {
+    "group": "streaming",
+    "label": "本地模式",
+    "file": "streaming/08_local_mode.png",
+    "selector": ".streaming-sidebar .streaming-menu-icon.pi-desktop",
+    "legacyGlyph": true
+  }
+]
