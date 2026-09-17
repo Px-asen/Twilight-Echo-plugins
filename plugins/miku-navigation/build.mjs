@@ -1,4 +1,5 @@
 import { palette } from './palette.mjs'
+import { createEditor } from './editor.mjs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
@@ -18,10 +19,10 @@ const rules = [
   `${settingsIcons.map((icon) => `${icon.selector}::before`).join(',\n')} {\n  visibility: hidden;\n}`
 ]
 
-for (const icon of icons) {
+for (const [index, icon] of icons.entries()) {
   const data = await readFile(new URL(`icons/${icon.file}`, root))
   rules.push(
-    `${imageSelector(icon)} {\n  background-image: url('data:image/png;base64,${data.toString('base64')}');\n}`
+    `${imageSelector(icon)} {\n  background-image: var(--miku-icon-${index}, url('data:image/png;base64,${data.toString('base64')}'));\n}`
   )
 }
 
@@ -59,6 +60,7 @@ rules.push(await readFile(new URL('states.css', root), 'utf8'))
 rules.push(await readFile(new URL('chrome.css', root), 'utf8'))
 const manifestUrl = new URL('plugin.json', root)
 const manifest = JSON.parse(await readFile(manifestUrl, 'utf8'))
+manifest.contributes.themes[0].editor = createEditor(icons)
 manifest.contributes.themes[0].structured = {
   schemaVersion: 1,
   variants: { pureWhite: palette(false), dark: palette(true) }
