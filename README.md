@@ -214,3 +214,7 @@ installing. Regenerate and commit `plugins.json` every time a package changes.
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+### Jellyfin 音源
+
+`com.twilightecho.provider.jellyfin`：通过服务器地址、用户名和密码登录，支持音乐搜索、全部音乐、歌单、封面和音频播放。需使用包含服务器登录表单的宿主构建，参见 [插件说明](plugins/jellyfin-provider/README.md)。
