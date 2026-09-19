@@ -10,12 +10,12 @@ html[data-theme='dark']:not(.mini-player-document):not(.desktop-lyrics-document)
   --miku-wall-wash: 43%;
 }
 
-html:root body:has(.app-shell):has(.home) {
+html:root body:has(> :where(#app) > .app-shell):has(.home) {
   --miku-wall-wash: 50%;
 }
 
-html:root body:has(.app-shell),
-html:root body:has(.app-shell) .settings-overlay-root--active::before {
+html:root body:has(> :where(#app) > .app-shell),
+html:root body:has(> :where(#app) > .app-shell) .settings-overlay-root--active::before {
   --miku-wall-layers:
     linear-gradient(
       90deg,
@@ -36,22 +36,22 @@ html:root body:has(.app-shell) .settings-overlay-root--active::before {
     var(--miku-wall-size) !important;
   background-position: center, center, var(--miku-wall-position) !important;
   background-repeat: no-repeat !important;
-  background-attachment: fixed !important;
+  background-attachment: scroll !important;
 }
 
-html:root body:has(.app-shell) .settings-overlay-root--active {
+html:root body:has(> :where(#app) > .app-shell) .settings-overlay-root--active {
   --miku-wall-wash: 53%;
 }
 
-html:root body:has(.app-shell)::before,
-html:root body:has(.app-shell)::after,
-html:root body:has(.app-shell) .main-content::before,
-html:root body:has(.app-shell) .main-content::after {
+html:root body:has(> :where(#app) > .app-shell)::before,
+html:root body:has(> :where(#app) > .app-shell)::after,
+html:root body:has(> :where(#app) > .app-shell) .main-content::before,
+html:root body:has(> :where(#app) > .app-shell) .main-content::after {
   display: none !important;
 }
 
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   :is(
     .dashboard-wrapper,
     .home,
@@ -69,7 +69,7 @@ html:root
   background: transparent !important;
 }
 
-html:root body:has(.app-shell) .side-menu {
+html:root body:has(> :where(#app) > .app-shell) .side-menu {
   background-color: color-mix(in srgb, var(--miku-wall-paper) 88%, transparent) !important;
   background-image: none !important;
 }

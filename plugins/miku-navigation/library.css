@@ -1,5 +1,5 @@
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   :is(
     .song-list:has(.track-table-wrapper),
     .streaming-content:has(.stage-rows, .track-table-wrapper)
@@ -50,7 +50,7 @@ html:root
   -webkit-backdrop-filter: none !important;
 }
 html[data-theme='dark']:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   :is(
     .song-list:has(.track-table-wrapper),
     .streaming-content:has(.stage-rows, .track-table-wrapper)
@@ -58,29 +58,29 @@ html[data-theme='dark']:root
   --miku-library-wash: 60%;
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table,
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table tbody {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table,
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table tbody {
   background: transparent !important;
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table thead {
-  background: color-mix(in srgb, var(--miku-wall-paper) 48%, transparent) !important;
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table thead {
+  background: color-mix(in srgb, var(--miku-wall-paper) 88%, transparent) !important;
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table th {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table th {
   background: transparent !important;
   color: var(--te-neutral-500);
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.track-playing,
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.track-selected {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-row.track-playing,
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-row.track-selected {
   background: var(--te-library-selection-bg) !important;
   box-shadow: inset 0 0 0 1px var(--te-library-selection-indicator);
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.track-playing::before,
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-row.track-playing::before,
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   :is(.song-list, .streaming-content)
   .track-row.track-selected::before {
   background: transparent;
@@ -88,13 +88,13 @@ html:root
   backdrop-filter: none;
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.track-playing::after {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-row.track-playing::after {
   background: var(--te-library-selection-indicator);
 }
 
 @media (max-width: 900px) {
   html:root
-    body:has(.app-shell)
+    body:has(> :where(#app) > .app-shell)
     :is(
       .song-list:has(.track-table-wrapper),
       .streaming-content:has(.stage-rows, .track-table-wrapper)
@@ -107,7 +107,7 @@ html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.tr
   }
 
   html[data-theme='dark']:root
-    body:has(.app-shell)
+    body:has(> :where(#app) > .app-shell)
     :is(
       .song-list:has(.track-table-wrapper),
       .streaming-content:has(.stage-rows, .track-table-wrapper)
@@ -116,29 +116,29 @@ html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.tr
   }
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table-wrapper {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table-wrapper {
   background: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-html:root body:has(.app-shell) .streaming-content .stage-list,
-html:root body:has(.app-shell) .streaming-content .stage-rows {
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-list,
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-rows {
   background: transparent !important;
   backdrop-filter: none !important;
 }
-html:root body:has(.app-shell) .streaming-content .stage-list-head {
-  background: color-mix(in srgb, var(--miku-wall-paper) 48%, transparent) !important;
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-list-head {
+  background: color-mix(in srgb, var(--miku-wall-paper) 88%, transparent) !important;
 }
-html:root body:has(.app-shell) .streaming-content .stage-row:hover {
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-row:hover {
   background: var(--te-library-row-hover) !important;
 }
-html:root body:has(.app-shell) .streaming-content .stage-row:is(.selected, .playing) {
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-row:is(.selected, .playing) {
   background: var(--te-library-selection-bg) !important;
   box-shadow: inset 0 0 0 1px var(--te-library-selection-indicator);
 }
 
-html:root body:has(.app-shell) .streaming-content .detail-stage {
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .detail-stage {
   --stage-ink: var(--te-neutral-900);
   --stage-ink-soft: var(--te-neutral-500);
   --stage-ink-faint: var(--te-neutral-500);
@@ -146,17 +146,17 @@ html:root body:has(.app-shell) .streaming-content .detail-stage {
   --stage-paper-raised: var(--te-card-bg);
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table thead,
-html:root body:has(.app-shell) .streaming-content .stage-list-head,
-html:root body:has(.app-shell) .streaming-content .track-tools {
-  background-color: color-mix(in srgb, var(--miku-wall-paper) 48%, transparent) !important;
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table thead,
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-list-head,
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .track-tools {
+  background-color: color-mix(in srgb, var(--miku-wall-paper) 88%, transparent) !important;
   background-image: none !important;
   box-shadow: none !important;
   border-color: color-mix(in srgb, var(--te-card-border) 55%, transparent) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   color: var(--te-neutral-500);
 }
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table thead tr {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table thead tr {
   background: transparent !important;
 }

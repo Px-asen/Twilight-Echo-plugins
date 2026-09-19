@@ -1,5 +1,5 @@
-html:root body:has(.app-shell) .title-bar,
-html:root body:has(.app-shell) .title-bar .title-bar-background {
+html:root body:has(> :where(#app) > .app-shell) .title-bar,
+html:root body:has(> :where(#app) > .app-shell) .title-bar .title-bar-background {
   background: transparent !important;
   border-bottom: 0 !important;
   box-shadow: none !important;
@@ -8,7 +8,7 @@ html:root body:has(.app-shell) .title-bar .title-bar-background {
 }
 
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   .title-bar.title-bar-menu-open:not(.title-bar-settings):not(.title-bar-streaming):not(
     .title-bar-glass
   )
@@ -22,7 +22,7 @@ html:root
 }
 
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   .title-bar:not(.title-bar-glass)
   :is(.menu-btn, .back-btn, .settings-btn, .plugins-btn, .login-btn, .control-btn) {
   color: var(--te-neutral-900) !important;
@@ -30,7 +30,7 @@ html:root
 }
 
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   .title-bar:not(.title-bar-glass)
   :is(.menu-btn, .back-btn, .settings-btn, .plugins-btn, .login-btn, .control-btn):not(
     .close
@@ -38,7 +38,7 @@ html:root
   background: color-mix(in srgb, var(--te-primary-500) 14%, transparent) !important;
 }
 
-html:root body:has(.app-shell) .title-bar:not(.title-bar-glass) .control-btn.close:hover {
+html:root body:has(> :where(#app) > .app-shell) .title-bar:not(.title-bar-glass) .control-btn.close:hover {
   background: #c42b36 !important;
   color: #ffffff !important;
 }

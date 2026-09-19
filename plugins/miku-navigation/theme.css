@@ -366,12 +366,12 @@ html[data-theme='dark']:not(.mini-player-document):not(.desktop-lyrics-document)
   --miku-wall-wash: 43%;
 }
 
-html:root body:has(.app-shell):has(.home) {
+html:root body:has(> :where(#app) > .app-shell):has(.home) {
   --miku-wall-wash: 50%;
 }
 
-html:root body:has(.app-shell),
-html:root body:has(.app-shell) .settings-overlay-root--active::before {
+html:root body:has(> :where(#app) > .app-shell),
+html:root body:has(> :where(#app) > .app-shell) .settings-overlay-root--active::before {
   --miku-wall-layers:
     linear-gradient(
       90deg,
@@ -392,22 +392,22 @@ html:root body:has(.app-shell) .settings-overlay-root--active::before {
     var(--miku-wall-size) !important;
   background-position: center, center, var(--miku-wall-position) !important;
   background-repeat: no-repeat !important;
-  background-attachment: fixed !important;
+  background-attachment: scroll !important;
 }
 
-html:root body:has(.app-shell) .settings-overlay-root--active {
+html:root body:has(> :where(#app) > .app-shell) .settings-overlay-root--active {
   --miku-wall-wash: 53%;
 }
 
-html:root body:has(.app-shell)::before,
-html:root body:has(.app-shell)::after,
-html:root body:has(.app-shell) .main-content::before,
-html:root body:has(.app-shell) .main-content::after {
+html:root body:has(> :where(#app) > .app-shell)::before,
+html:root body:has(> :where(#app) > .app-shell)::after,
+html:root body:has(> :where(#app) > .app-shell) .main-content::before,
+html:root body:has(> :where(#app) > .app-shell) .main-content::after {
   display: none !important;
 }
 
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   :is(
     .dashboard-wrapper,
     .home,
@@ -425,7 +425,7 @@ html:root
   background: transparent !important;
 }
 
-html:root body:has(.app-shell) .side-menu {
+html:root body:has(> :where(#app) > .app-shell) .side-menu {
   background-color: color-mix(in srgb, var(--miku-wall-paper) 88%, transparent) !important;
   background-image: none !important;
 }
@@ -449,30 +449,30 @@ html[data-theme='dark'] {
   --miku-on-accent: #102429;
 }
 
-html:root body:has(.app-shell) :is(.stream-action-btn, .search-tab-pill.active) {
+html:root body:has(> :where(#app) > .app-shell) :is(.stream-action-btn, .search-tab-pill.active) {
   background: var(--te-primary-500);
   color: var(--miku-on-accent);
 }
 
-html:root body:has(.app-shell) .plugin-page .discover-banner {
+html:root body:has(> :where(#app) > .app-shell) .plugin-page .discover-banner {
   background: var(--te-active-bg);
   color: var(--te-neutral-900);
 }
 
-html:root body:has(.app-shell) .track-row:hover {
+html:root body:has(> :where(#app) > .app-shell) .track-row:hover {
   background: var(--te-library-row-hover);
 }
 
-html:root body:has(.app-shell) .btn-like.liked {
+html:root body:has(> :where(#app) > .app-shell) .btn-like.liked {
   color: var(--te-favorite-500);
 }
 
-html:root body:has(.app-shell) .btn-like.liked:hover {
+html:root body:has(> :where(#app) > .app-shell) .btn-like.liked:hover {
   background: color-mix(in srgb, var(--te-favorite-500) 12%, transparent);
 }
 
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   :is(
     .song-list:has(.track-table-wrapper),
     .streaming-content:has(.stage-rows, .track-table-wrapper)
@@ -523,7 +523,7 @@ html:root
   -webkit-backdrop-filter: none !important;
 }
 html[data-theme='dark']:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   :is(
     .song-list:has(.track-table-wrapper),
     .streaming-content:has(.stage-rows, .track-table-wrapper)
@@ -531,29 +531,29 @@ html[data-theme='dark']:root
   --miku-library-wash: 60%;
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table,
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table tbody {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table,
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table tbody {
   background: transparent !important;
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table thead {
-  background: color-mix(in srgb, var(--miku-wall-paper) 48%, transparent) !important;
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table thead {
+  background: color-mix(in srgb, var(--miku-wall-paper) 88%, transparent) !important;
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table th {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table th {
   background: transparent !important;
   color: var(--te-neutral-500);
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.track-playing,
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.track-selected {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-row.track-playing,
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-row.track-selected {
   background: var(--te-library-selection-bg) !important;
   box-shadow: inset 0 0 0 1px var(--te-library-selection-indicator);
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.track-playing::before,
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-row.track-playing::before,
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   :is(.song-list, .streaming-content)
   .track-row.track-selected::before {
   background: transparent;
@@ -561,13 +561,13 @@ html:root
   backdrop-filter: none;
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.track-playing::after {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-row.track-playing::after {
   background: var(--te-library-selection-indicator);
 }
 
 @media (max-width: 900px) {
   html:root
-    body:has(.app-shell)
+    body:has(> :where(#app) > .app-shell)
     :is(
       .song-list:has(.track-table-wrapper),
       .streaming-content:has(.stage-rows, .track-table-wrapper)
@@ -580,7 +580,7 @@ html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.tr
   }
 
   html[data-theme='dark']:root
-    body:has(.app-shell)
+    body:has(> :where(#app) > .app-shell)
     :is(
       .song-list:has(.track-table-wrapper),
       .streaming-content:has(.stage-rows, .track-table-wrapper)
@@ -589,29 +589,29 @@ html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-row.tr
   }
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table-wrapper {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table-wrapper {
   background: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-html:root body:has(.app-shell) .streaming-content .stage-list,
-html:root body:has(.app-shell) .streaming-content .stage-rows {
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-list,
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-rows {
   background: transparent !important;
   backdrop-filter: none !important;
 }
-html:root body:has(.app-shell) .streaming-content .stage-list-head {
-  background: color-mix(in srgb, var(--miku-wall-paper) 48%, transparent) !important;
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-list-head {
+  background: color-mix(in srgb, var(--miku-wall-paper) 88%, transparent) !important;
 }
-html:root body:has(.app-shell) .streaming-content .stage-row:hover {
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-row:hover {
   background: var(--te-library-row-hover) !important;
 }
-html:root body:has(.app-shell) .streaming-content .stage-row:is(.selected, .playing) {
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-row:is(.selected, .playing) {
   background: var(--te-library-selection-bg) !important;
   box-shadow: inset 0 0 0 1px var(--te-library-selection-indicator);
 }
 
-html:root body:has(.app-shell) .streaming-content .detail-stage {
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .detail-stage {
   --stage-ink: var(--te-neutral-900);
   --stage-ink-soft: var(--te-neutral-500);
   --stage-ink-faint: var(--te-neutral-500);
@@ -619,18 +619,18 @@ html:root body:has(.app-shell) .streaming-content .detail-stage {
   --stage-paper-raised: var(--te-card-bg);
 }
 
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table thead,
-html:root body:has(.app-shell) .streaming-content .stage-list-head,
-html:root body:has(.app-shell) .streaming-content .track-tools {
-  background-color: color-mix(in srgb, var(--miku-wall-paper) 48%, transparent) !important;
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table thead,
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .stage-list-head,
+html:root body:has(> :where(#app) > .app-shell) .streaming-content .track-tools {
+  background-color: color-mix(in srgb, var(--miku-wall-paper) 88%, transparent) !important;
   background-image: none !important;
   box-shadow: none !important;
   border-color: color-mix(in srgb, var(--te-card-border) 55%, transparent) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   color: var(--te-neutral-500);
 }
-html:root body:has(.app-shell) :is(.song-list, .streaming-content) .track-table thead tr {
+html:root body:has(> :where(#app) > .app-shell) :is(.song-list, .streaming-content) .track-table thead tr {
   background: transparent !important;
 }
 
@@ -818,8 +818,8 @@ html:root .settings-preview-layout .library-scan-copy.success-copy::before {
   }
 }
 
-html:root body:has(.app-shell) .title-bar,
-html:root body:has(.app-shell) .title-bar .title-bar-background {
+html:root body:has(> :where(#app) > .app-shell) .title-bar,
+html:root body:has(> :where(#app) > .app-shell) .title-bar .title-bar-background {
   background: transparent !important;
   border-bottom: 0 !important;
   box-shadow: none !important;
@@ -828,7 +828,7 @@ html:root body:has(.app-shell) .title-bar .title-bar-background {
 }
 
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   .title-bar.title-bar-menu-open:not(.title-bar-settings):not(.title-bar-streaming):not(
     .title-bar-glass
   )
@@ -842,7 +842,7 @@ html:root
 }
 
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   .title-bar:not(.title-bar-glass)
   :is(.menu-btn, .back-btn, .settings-btn, .plugins-btn, .login-btn, .control-btn) {
   color: var(--te-neutral-900) !important;
@@ -850,7 +850,7 @@ html:root
 }
 
 html:root
-  body:has(.app-shell)
+  body:has(> :where(#app) > .app-shell)
   .title-bar:not(.title-bar-glass)
   :is(.menu-btn, .back-btn, .settings-btn, .plugins-btn, .login-btn, .control-btn):not(
     .close
@@ -858,7 +858,7 @@ html:root
   background: color-mix(in srgb, var(--te-primary-500) 14%, transparent) !important;
 }
 
-html:root body:has(.app-shell) .title-bar:not(.title-bar-glass) .control-btn.close:hover {
+html:root body:has(> :where(#app) > .app-shell) .title-bar:not(.title-bar-glass) .control-btn.close:hover {
   background: #c42b36 !important;
   color: #ffffff !important;
 }
