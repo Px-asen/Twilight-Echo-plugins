@@ -56,7 +56,6 @@
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "sourceUrl": "packages/com.twilightecho.provider.jellyfin-0.1.0.tep",
       "checksumSha256": "1bdf852820bb70c534f3706215ca2a071bb629b39058af941d3f98b7a1686487",
-      "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "tags": [
         "provider"
       ],
@@ -1058,8 +1057,6 @@
       },
       "sourceUrl": "packages/com.twilightecho.theme.miku-navigation-0.9.4.tep",
       "checksumSha256": "8777d7bdf8b98a345fb9aaf4da0da3ca63bc6523e867d3ba7aa589d81887ff47",
-      "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "tags": [
         "theme"
       ],

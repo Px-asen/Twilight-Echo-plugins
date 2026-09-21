@@ -215,6 +215,9 @@ Pure theme plugins declare `contributes.themes` without `main` or `binary`.
 The packer includes declared theme stylesheets and the plugin icon. Build the theme
 before packaging, then run `pnpm run index` and `pnpm run validate:index` before
 publishing the package and index together.
+Index metadata such as `homepage` and `repository` must match the packaged manifest
+exactly, including omitted fields. Set these in the plugin source and rebuild the
+package; the index generator does not add defaults or allow differing overrides.
 
 ## License
 

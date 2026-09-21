@@ -9,7 +9,6 @@ import { promisify } from 'node:util'
 const execFileAsync = promisify(execFile)
 
 const INDEX_SCHEMA_VERSION = 1
-const DEFAULT_REPOSITORY = 'https://github.com/Px-asen/Twilight-Echo-plugins'
 const BUNDLED_PLUGIN_IDS = new Set(['com.twilightecho.provider.ncm'])
 const REQUIRED_FIELDS = [
   'id',
@@ -53,22 +52,15 @@ export async function generatePluginIndex(options = {}) {
     if (seenIds.has(manifest.id)) throw new Error(`插件索引存在重复插件 id：${manifest.id}`)
     seenIds.add(manifest.id)
     const buffer = await readFile(packagePath)
-    const repository =
-      options.repository ??
-      (typeof manifest.repository === 'string' && manifest.repository.trim()
-        ? manifest.repository.trim()
-        : DEFAULT_REPOSITORY)
-    const homepage =
-      options.homepage ??
-      (typeof manifest.homepage === 'string' && manifest.homepage.trim()
-        ? manifest.homepage.trim()
-        : repository)
+    for (const field of ['repository', 'homepage']) {
+      if (options[field] !== undefined && options[field] !== manifest[field]) {
+        throw new Error(`${manifest.id} ${field} 必须与安装包 manifest 一致，请修改源码并重新打包`)
+      }
+    }
     entries.push({
       ...manifest,
       sourceUrl: packageSourceUrl(packageName, options.baseUrl),
       checksumSha256: createHash('sha256').update(buffer).digest('hex'),
-      repository,
-      homepage,
       tags: inferTags(manifest),
       verified: true
     })

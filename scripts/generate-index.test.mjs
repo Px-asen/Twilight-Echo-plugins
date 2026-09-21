@@ -109,8 +109,29 @@ test('generates plugins.json from packaged tep files', async () => {
   assert.equal(index.plugins[0].id, manifest.id)
   assert.equal(index.plugins[0].sourceUrl, `packages/${manifest.id}-${manifest.version}.tep`)
   assert.equal(index.plugins[0].checksumSha256, checksumSha256)
-  assert.equal(index.plugins[0].repository, 'https://github.com/Px-asen/Twilight-Echo-plugins')
+  assert.equal(index.plugins[0].repository, undefined)
+  assert.equal(index.plugins[0].homepage, undefined)
   assert.equal(index.plugins[0].verified, true)
+})
+
+test('preserves packaged metadata and rejects index-only metadata overrides', async () => {
+  for (const metadata of [
+    {},
+    { repository: 'https://example.com/repo', homepage: 'https://example.com' }
+  ]) {
+    const root = await createRepoFixture()
+    const packaged = { ...manifest, ...metadata }
+    await createPluginPackage(root, packaged)
+    const index = await generatePluginIndex({ repoRoot: root })
+    for (const field of ['repository', 'homepage']) {
+      assert.equal(index.plugins[0][field], packaged[field])
+      assert.equal(Object.hasOwn(index.plugins[0], field), Object.hasOwn(packaged, field))
+      await assert.rejects(
+        () => generatePluginIndex({ repoRoot: root, [field]: 'https://different.example.com' }),
+        /必须与安装包 manifest 一致/
+      )
+    }
+  }
 })
 
 test('validate mode rejects a stale plugins.json', async () => {
