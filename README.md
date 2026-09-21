@@ -211,6 +211,11 @@ pnpm run pack
 Twilight Echo validates the `.tep` SHA-256 from `plugins.json` before
 installing. Regenerate and commit `plugins.json` every time a package changes.
 
+Pure theme plugins declare `contributes.themes` without `main` or `binary`.
+The packer includes declared theme stylesheets and the plugin icon. Build the theme
+before packaging, then run `pnpm run index` and `pnpm run validate:index` before
+publishing the package and index together.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).

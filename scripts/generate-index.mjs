@@ -110,10 +110,18 @@ function validateManifest(manifest, packageName) {
     throw new Error(`${packageName} 缺少有效 plugin.json`)
   }
   for (const field of REQUIRED_FIELDS) {
-    if (!(field in manifest)) throw new Error(`${manifest.id ?? packageName} 缺少 manifest 字段：${field}`)
+    if (!(field in manifest))
+      throw new Error(`${manifest.id ?? packageName} 缺少 manifest 字段：${field}`)
   }
-  if (!manifest.main && !manifest.binary) {
-    throw new Error(`${manifest.id} 必须声明 main 或 binary`)
+  const isPureTheme =
+    Array.isArray(manifest.type) && manifest.type.length === 1 && manifest.type[0] === 'theme'
+  const hasThemes =
+    Array.isArray(manifest.contributes?.themes) && manifest.contributes.themes.length > 0
+  if (isPureTheme && (manifest.main || manifest.binary)) {
+    throw new Error(`${manifest.id} 纯主题不能声明 main 或 binary`)
+  }
+  if (!manifest.main && !manifest.binary && !(isPureTheme && hasThemes)) {
+    throw new Error(`${manifest.id} 必须声明 main 或 binary，或为纯主题声明 contributes.themes`)
   }
   if (manifest.type?.includes('dsp') && !manifest.binary) {
     throw new Error(`${manifest.id} 是 DSP 插件但缺少 binary`)
@@ -159,8 +167,12 @@ function inferTags(manifest) {
 }
 
 function compareSemver(left, right) {
-  const leftParts = String(left).split('.').map((part) => Number.parseInt(part, 10) || 0)
-  const rightParts = String(right).split('.').map((part) => Number.parseInt(part, 10) || 0)
+  const leftParts = String(left)
+    .split('.')
+    .map((part) => Number.parseInt(part, 10) || 0)
+  const rightParts = String(right)
+    .split('.')
+    .map((part) => Number.parseInt(part, 10) || 0)
   for (let index = 0; index < 3; index += 1) {
     if (leftParts[index] > rightParts[index]) return 1
     if (leftParts[index] < rightParts[index]) return -1
@@ -183,7 +195,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     write: !process.argv.includes('--validate')
   })
     .then((index) => {
-      console.log(`${process.argv.includes('--validate') ? 'Validated' : 'Generated'} ${index.plugins.length} plugin entries`)
+      console.log(
+        `${process.argv.includes('--validate') ? 'Validated' : 'Generated'} ${index.plugins.length} plugin entries`
+      )
     })
     .catch((error) => {
       console.error(error instanceof Error ? error.message : String(error))

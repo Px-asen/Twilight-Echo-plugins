@@ -199,6 +199,871 @@
         "youtube-music"
       ],
       "verified": true
+    },
+    {
+      "id": "com.twilightecho.theme.miku-navigation",
+      "name": "Miku 导航",
+      "version": "0.9.4",
+      "description": "30 张初音未来导航图标、首页柔边插画与青蓝全局背景，支持深浅色，保留原有菜单、歌曲信息和专辑封面布局。",
+      "author": "Pxasen",
+      "license": "LicenseRef-Miku-Navigation-Preview",
+      "type": [
+        "theme"
+      ],
+      "engines": {
+        "twilightEcho": ">=1.2.0"
+      },
+      "apiVersion": 3,
+      "permissions": [],
+      "icon": "icons/01_home.png",
+      "contributes": {
+        "themes": [
+          {
+            "id": "miku-navigation",
+            "name": "Miku 导航",
+            "description": "初音未来导航图标与首页插画 · 本地预览版",
+            "stylesheet": "theme.css",
+            "structured": {
+              "schemaVersion": 1,
+              "variants": {
+                "pureWhite": {
+                  "tokens": {
+                    "color.primary.500": "#087f79",
+                    "color.primary.400": "#066d68",
+                    "color.primary.300": "#398f87",
+                    "color.primary.rgb": "8, 127, 121",
+                    "color.favorite": "#a74870",
+                    "color.accentCyan": "#137e8c",
+                    "color.neutral.50": "#eaf4f3",
+                    "color.neutral.100": "#f8fcfa",
+                    "color.neutral.200": "#caddd7",
+                    "color.neutral.300": "#718f88",
+                    "color.neutral.500": "#526c6e",
+                    "color.neutral.700": "#355650",
+                    "color.neutral.900": "#183b3d",
+                    "background.gradientStart": "#eaf4f3",
+                    "background.gradientEnd": "#dcefeb",
+                    "surface.app": "#eaf4f3",
+                    "surface.local": "#eaf4f3",
+                    "surface.settings": "#eaf4f3",
+                    "surface.streaming": "#eaf4f3",
+                    "surface.card": "#f8fcfa",
+                    "surface.player": "#f8fcfa",
+                    "settings.control.surface": "#f8fcfa",
+                    "navigation.surface": "#f8fcfa",
+                    "playback.equalizer.panelSurface": "#f8fcfa",
+                    "playback.equalizer.buttonSurface": "#f8fcfa",
+                    "surface.cardBorder": "#caddd7",
+                    "settings.control.border": "#caddd7",
+                    "settings.panel.border": "#caddd7",
+                    "navigation.border": "#caddd7",
+                    "library.table.border": "#caddd7",
+                    "playback.equalizer.panelBorder": "#caddd7",
+                    "shell.control.text": "#183b3d",
+                    "settings.text.primary": "#183b3d",
+                    "settings.navigation.text": "#183b3d",
+                    "navigation.text": "#183b3d",
+                    "navigation.hoverText": "#183b3d",
+                    "library.row.text": "#183b3d",
+                    "typography.chromeText": "#183b3d",
+                    "settings.text.muted": "#526c6e",
+                    "navigation.icon": "#526c6e",
+                    "library.icon": "#526c6e",
+                    "surface.subtle": "#e4f2ed",
+                    "surface.hover": "#e4f2ed",
+                    "shell.control.hoverSurface": "#e4f2ed",
+                    "settings.navigation.hoverSurface": "#e4f2ed",
+                    "navigation.hoverSurface": "#e4f2ed",
+                    "library.row.hoverSurface": "#e4f2ed",
+                    "library.actionSurface": "#e4f2ed",
+                    "surface.active": "#d7eee8",
+                    "settings.navigation.activeSurface": "#d7eee8",
+                    "navigation.activeSurface": "#d7eee8",
+                    "library.selection.surface": "#d7eee8",
+                    "library.selection.hoverSurface": "#d7eee8",
+                    "navigation.activeText": "#066d68",
+                    "navigation.indicator": "#087f79",
+                    "library.selection.indicator": "#087f79",
+                    "playback.accent": "#087f79",
+                    "playback.equalizer.sliderThumb": "#087f79",
+                    "playback.equalizer.guide": "#087f79",
+                    "playback.equalizer.spectrum": "#087f79",
+                    "library.table.surface": "rgba(248,252,250,0.45)",
+                    "material.glass": "rgba(248,252,250,0.88)",
+                    "material.glassStrong": "rgba(248,252,250,0.96)",
+                    "material.glassBorder": "#caddd7",
+                    "material.glowMain": "rgba(8,127,121,0.08)",
+                    "material.glowSoft": "rgba(8,127,121,0.08)",
+                    "material.glowCyan": "rgba(8,127,121,0.08)",
+                    "playback.progress.track": "#90b6ae",
+                    "playback.equalizer.sliderTrack": "#90b6ae",
+                    "playback.equalizer.grid": "#90b6ae"
+                  }
+                },
+                "dark": {
+                  "tokens": {
+                    "color.primary.500": "#63d6c8",
+                    "color.primary.400": "#8be5d8",
+                    "color.primary.300": "#b0eee3",
+                    "color.primary.rgb": "99, 214, 200",
+                    "color.favorite": "#e69bb7",
+                    "color.accentCyan": "#78cbd1",
+                    "color.neutral.50": "#102429",
+                    "color.neutral.100": "#193137",
+                    "color.neutral.200": "#355354",
+                    "color.neutral.300": "#769b98",
+                    "color.neutral.500": "#a5bfbd",
+                    "color.neutral.700": "#c5ddd5",
+                    "color.neutral.900": "#e7f4ef",
+                    "background.gradientStart": "#102429",
+                    "background.gradientEnd": "#18363a",
+                    "surface.app": "#102429",
+                    "surface.local": "#102429",
+                    "surface.settings": "#102429",
+                    "surface.streaming": "#102429",
+                    "surface.card": "#193137",
+                    "surface.player": "#193137",
+                    "settings.control.surface": "#193137",
+                    "navigation.surface": "#193137",
+                    "playback.equalizer.panelSurface": "#193137",
+                    "playback.equalizer.buttonSurface": "#193137",
+                    "surface.cardBorder": "#355354",
+                    "settings.control.border": "#355354",
+                    "settings.panel.border": "#355354",
+                    "navigation.border": "#355354",
+                    "library.table.border": "#355354",
+                    "playback.equalizer.panelBorder": "#355354",
+                    "shell.control.text": "#e7f4ef",
+                    "settings.text.primary": "#e7f4ef",
+                    "settings.navigation.text": "#e7f4ef",
+                    "navigation.text": "#e7f4ef",
+                    "navigation.hoverText": "#e7f4ef",
+                    "library.row.text": "#e7f4ef",
+                    "typography.chromeText": "#e7f4ef",
+                    "settings.text.muted": "#a5bfbd",
+                    "navigation.icon": "#a5bfbd",
+                    "library.icon": "#a5bfbd",
+                    "surface.subtle": "#244341",
+                    "surface.hover": "#244341",
+                    "shell.control.hoverSurface": "#244341",
+                    "settings.navigation.hoverSurface": "#244341",
+                    "navigation.hoverSurface": "#244341",
+                    "library.row.hoverSurface": "#244341",
+                    "library.actionSurface": "#244341",
+                    "surface.active": "#244a49",
+                    "settings.navigation.activeSurface": "#244a49",
+                    "navigation.activeSurface": "#244a49",
+                    "library.selection.surface": "#244a49",
+                    "library.selection.hoverSurface": "#244a49",
+                    "navigation.activeText": "#63d6c8",
+                    "navigation.indicator": "#63d6c8",
+                    "library.selection.indicator": "#63d6c8",
+                    "playback.accent": "#63d6c8",
+                    "playback.equalizer.sliderThumb": "#63d6c8",
+                    "playback.equalizer.guide": "#63d6c8",
+                    "playback.equalizer.spectrum": "#63d6c8",
+                    "library.table.surface": "rgba(16,36,41,0.45)",
+                    "material.glass": "rgba(25,49,55,0.84)",
+                    "material.glassStrong": "rgba(25,49,55,0.96)",
+                    "material.glassBorder": "#355354",
+                    "material.glowMain": "rgba(99,214,200,0.10)",
+                    "material.glowSoft": "rgba(99,214,200,0.10)",
+                    "material.glowCyan": "rgba(99,214,200,0.10)",
+                    "playback.progress.track": "#466b69",
+                    "playback.equalizer.sliderTrack": "#466b69",
+                    "playback.equalizer.grid": "#466b69"
+                  }
+                }
+              }
+            },
+            "editor": {
+              "schemaVersion": 1,
+              "controls": [
+                {
+                  "id": "wall-image",
+                  "label": "全局背景图片",
+                  "group": "全局背景",
+                  "variable": "--miku-wall-image",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "wall-wash",
+                  "label": "背景蒙版",
+                  "group": "全局背景",
+                  "variable": "--miku-wall-wash",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "33%",
+                    "dark": "43%"
+                  },
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100
+                },
+                {
+                  "id": "wall-position",
+                  "label": "背景位置",
+                  "group": "全局背景",
+                  "variable": "--miku-wall-position",
+                  "type": "text",
+                  "defaults": {
+                    "pureWhite": "center 42%",
+                    "dark": "center 42%"
+                  }
+                },
+                {
+                  "id": "wall-size",
+                  "label": "背景缩放",
+                  "group": "全局背景",
+                  "variable": "--miku-wall-size",
+                  "type": "select",
+                  "defaults": {
+                    "pureWhite": "cover",
+                    "dark": "cover"
+                  },
+                  "options": [
+                    "cover",
+                    "contain",
+                    "100% auto",
+                    "auto 100%"
+                  ]
+                },
+                {
+                  "id": "home-wall-wash",
+                  "label": "首页背景蒙版",
+                  "group": "全局背景",
+                  "variable": "--miku-wall-wash",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "50%",
+                    "dark": "50%"
+                  },
+                  "selector": "body:has(.app-shell):has(.home)",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100
+                },
+                {
+                  "id": "settings-wall-wash",
+                  "label": "设置背景蒙版",
+                  "group": "设置",
+                  "variable": "--miku-wall-wash",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "53%",
+                    "dark": "53%"
+                  },
+                  "selector": "body:has(.app-shell) .settings-overlay-root--active",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100
+                },
+                {
+                  "id": "hero-image",
+                  "label": "首页插画",
+                  "group": "首页卡片",
+                  "variable": "--miku-hero-image",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  },
+                  "targets": {
+                    "local": ".home .feature-card",
+                    "streaming": ".streaming-page .home-view .hero"
+                  }
+                },
+                {
+                  "id": "hero-size",
+                  "label": "插画大小",
+                  "group": "首页卡片",
+                  "variable": "--miku-hero-size",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "72%",
+                    "dark": "72%"
+                  },
+                  "selector": ":is(.home .feature-card, .streaming-page .home-view .hero)",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 200,
+                  "targets": {
+                    "local": ".home .feature-card",
+                    "streaming": ".streaming-page .home-view .hero"
+                  }
+                },
+                {
+                  "id": "hero-x",
+                  "label": "水平位置",
+                  "group": "首页卡片",
+                  "variable": "--miku-hero-x",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "70%",
+                    "dark": "70%"
+                  },
+                  "selector": ":is(.home .feature-card, .streaming-page .home-view .hero)",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100,
+                  "targets": {
+                    "local": ".home .feature-card",
+                    "streaming": ".streaming-page .home-view .hero"
+                  }
+                },
+                {
+                  "id": "hero-y",
+                  "label": "垂直位置",
+                  "group": "首页卡片",
+                  "variable": "--miku-hero-y",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "12%",
+                    "dark": "12%"
+                  },
+                  "selector": ":is(.home .feature-card, .streaming-page .home-view .hero)",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100,
+                  "targets": {
+                    "local": ".home .feature-card",
+                    "streaming": ".streaming-page .home-view .hero"
+                  }
+                },
+                {
+                  "id": "hero-mask",
+                  "label": "左侧淡化",
+                  "group": "首页卡片",
+                  "variable": "--miku-hero-mask",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "22%",
+                    "dark": "22%"
+                  },
+                  "selector": ":is(.home .feature-card, .streaming-page .home-view .hero)",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100,
+                  "targets": {
+                    "local": ".home .feature-card",
+                    "streaming": ".streaming-page .home-view .hero"
+                  }
+                },
+                {
+                  "id": "hero-opacity",
+                  "label": "插画透明度",
+                  "group": "首页卡片",
+                  "variable": "--miku-hero-opacity",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "0.96",
+                    "dark": "0.96"
+                  },
+                  "selector": ":is(.home .feature-card, .streaming-page .home-view .hero)",
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.01,
+                  "targets": {
+                    "local": ".home .feature-card",
+                    "streaming": ".streaming-page .home-view .hero"
+                  }
+                },
+                {
+                  "id": "library-image",
+                  "label": "歌曲列表插画",
+                  "group": "歌曲列表",
+                  "variable": "--miku-library-image",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  },
+                  "targets": {
+                    "local": "body:has(.app-shell) .song-list:has(.track-table-wrapper)",
+                    "streaming": "body:has(.app-shell) .streaming-content:has(.stage-rows, .track-table-wrapper)"
+                  }
+                },
+                {
+                  "id": "library-wash",
+                  "label": "列表蒙版",
+                  "group": "歌曲列表",
+                  "variable": "--miku-library-wash",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "44%",
+                    "dark": "60%"
+                  },
+                  "selector": "body:has(.app-shell) :is(.song-list:has(.track-table-wrapper), .streaming-content:has(.stage-rows, .track-table-wrapper))",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100,
+                  "targets": {
+                    "local": "body:has(.app-shell) .song-list:has(.track-table-wrapper)",
+                    "streaming": "body:has(.app-shell) .streaming-content:has(.stage-rows, .track-table-wrapper)"
+                  }
+                },
+                {
+                  "id": "library-width",
+                  "label": "人物宽度",
+                  "group": "歌曲列表",
+                  "variable": "--miku-library-art-width",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "618.75px",
+                    "dark": "618.75px"
+                  },
+                  "selector": "body:has(.app-shell) :is(.song-list:has(.track-table-wrapper), .streaming-content:has(.stage-rows, .track-table-wrapper))",
+                  "unit": "px",
+                  "min": 100,
+                  "max": 1600,
+                  "step": 0.25,
+                  "targets": {
+                    "local": "body:has(.app-shell) .song-list:has(.track-table-wrapper)",
+                    "streaming": "body:has(.app-shell) .streaming-content:has(.stage-rows, .track-table-wrapper)"
+                  }
+                },
+                {
+                  "id": "library-height",
+                  "label": "人物高度",
+                  "group": "歌曲列表",
+                  "variable": "--miku-library-art-height",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "1100px",
+                    "dark": "1100px"
+                  },
+                  "selector": "body:has(.app-shell) :is(.song-list:has(.track-table-wrapper), .streaming-content:has(.stage-rows, .track-table-wrapper))",
+                  "unit": "px",
+                  "min": 100,
+                  "max": 2000,
+                  "step": 0.25,
+                  "targets": {
+                    "local": "body:has(.app-shell) .song-list:has(.track-table-wrapper)",
+                    "streaming": "body:has(.app-shell) .streaming-content:has(.stage-rows, .track-table-wrapper)"
+                  }
+                },
+                {
+                  "id": "library-top",
+                  "label": "垂直偏移",
+                  "group": "歌曲列表",
+                  "variable": "--miku-library-art-top",
+                  "type": "number",
+                  "defaults": {
+                    "pureWhite": "-60px",
+                    "dark": "-60px"
+                  },
+                  "selector": "body:has(.app-shell) :is(.song-list:has(.track-table-wrapper), .streaming-content:has(.stage-rows, .track-table-wrapper))",
+                  "unit": "px",
+                  "min": -600,
+                  "max": 600,
+                  "step": 0.25,
+                  "targets": {
+                    "local": "body:has(.app-shell) .song-list:has(.track-table-wrapper)",
+                    "streaming": "body:has(.app-shell) .streaming-content:has(.stage-rows, .track-table-wrapper)"
+                  }
+                },
+                {
+                  "id": "state-peek",
+                  "label": "peek",
+                  "group": "状态插画",
+                  "variable": "--miku-state-peek",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "state-listening",
+                  "label": "listening",
+                  "group": "状态插画",
+                  "variable": "--miku-state-listening",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "state-thinking",
+                  "label": "thinking",
+                  "group": "状态插画",
+                  "variable": "--miku-state-thinking",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "state-done",
+                  "label": "done",
+                  "group": "状态插画",
+                  "variable": "--miku-state-done",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "state-empty",
+                  "label": "empty",
+                  "group": "状态插画",
+                  "variable": "--miku-state-empty",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-0",
+                  "label": "首页",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-0",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-1",
+                  "label": "所有歌曲",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-1",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-2",
+                  "label": "艺术家",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-2",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-3",
+                  "label": "专辑",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-3",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-4",
+                  "label": "流派",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-4",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-5",
+                  "label": "歌单",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-5",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-6",
+                  "label": "聚合歌单",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-6",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-7",
+                  "label": "文件夹",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-7",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-8",
+                  "label": "最近播放",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-8",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-9",
+                  "label": "流媒体",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-9",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-10",
+                  "label": "电台 / 播客",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-10",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-11",
+                  "label": "网络源",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-11",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-12",
+                  "label": "导入歌曲",
+                  "group": "导航图标",
+                  "variable": "--miku-icon-12",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-13",
+                  "label": "常规",
+                  "group": "设置图标",
+                  "variable": "--miku-icon-13",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-14",
+                  "label": "播放",
+                  "group": "设置图标",
+                  "variable": "--miku-icon-14",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-15",
+                  "label": "DSP",
+                  "group": "设置图标",
+                  "variable": "--miku-icon-15",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-16",
+                  "label": "缓存",
+                  "group": "设置图标",
+                  "variable": "--miku-icon-16",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-17",
+                  "label": "性能",
+                  "group": "设置图标",
+                  "variable": "--miku-icon-17",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-18",
+                  "label": "外观",
+                  "group": "设置图标",
+                  "variable": "--miku-icon-18",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-19",
+                  "label": "桌面歌词",
+                  "group": "设置图标",
+                  "variable": "--miku-icon-19",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-20",
+                  "label": "快捷键",
+                  "group": "设置图标",
+                  "variable": "--miku-icon-20",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-21",
+                  "label": "关于",
+                  "group": "设置图标",
+                  "variable": "--miku-icon-21",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-22",
+                  "label": "主页",
+                  "group": "流媒体图标",
+                  "variable": "--miku-icon-22",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-23",
+                  "label": "发现歌单",
+                  "group": "流媒体图标",
+                  "variable": "--miku-icon-23",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-24",
+                  "label": "音乐库",
+                  "group": "流媒体图标",
+                  "variable": "--miku-icon-24",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-25",
+                  "label": "音乐云盘",
+                  "group": "流媒体图标",
+                  "variable": "--miku-icon-25",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-26",
+                  "label": "最近播放",
+                  "group": "流媒体图标",
+                  "variable": "--miku-icon-26",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-27",
+                  "label": "Bilibili",
+                  "group": "流媒体图标",
+                  "variable": "--miku-icon-27",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-28",
+                  "label": "聚合歌单",
+                  "group": "流媒体图标",
+                  "variable": "--miku-icon-28",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                },
+                {
+                  "id": "icon-29",
+                  "label": "本地模式",
+                  "group": "流媒体图标",
+                  "variable": "--miku-icon-29",
+                  "type": "image",
+                  "defaults": {
+                    "pureWhite": "none",
+                    "dark": "none"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "sourceUrl": "packages/com.twilightecho.theme.miku-navigation-0.9.4.tep",
+      "checksumSha256": "8777d7bdf8b98a345fb9aaf4da0da3ca63bc6523e867d3ba7aa589d81887ff47",
+      "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
+      "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
+      "tags": [
+        "theme"
+      ],
+      "verified": true
     }
   ]
 }

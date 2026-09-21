@@ -45,7 +45,9 @@ async function main() {
   }
   if (manifest.binary) {
     for (const binaryPath of Object.values(manifest.binary)) {
-      await fs.mkdir(path.dirname(path.join(stagingDir, binaryPath)), { recursive: true })
+      await fs.mkdir(path.dirname(path.join(stagingDir, binaryPath)), {
+        recursive: true
+      })
       await fs.copyFile(path.join(pluginRoot, binaryPath), path.join(stagingDir, binaryPath))
     }
   }
@@ -56,7 +58,15 @@ async function main() {
   if (!Array.isArray(runtimeFiles)) {
     throw new Error('plugin.json runtimeFiles must be an array')
   }
-  for (const runtimePath of runtimeFiles) {
+  const themeFiles = (rawManifest.contributes?.themes ?? [])
+    .map((theme) => theme.stylesheet)
+    .filter(Boolean)
+  const packageFiles = new Set([
+    ...runtimeFiles,
+    ...themeFiles,
+    ...(rawManifest.icon ? [rawManifest.icon] : [])
+  ])
+  for (const runtimePath of packageFiles) {
     if (typeof runtimePath !== 'string' || !runtimePath.trim()) {
       throw new Error('plugin.json runtimeFiles must contain non-empty relative paths')
     }
@@ -75,7 +85,10 @@ async function main() {
     const targetPath = path.join(stagingDir, ...relative.split('/'))
     const sourceStats = await fs.stat(sourcePath)
     if (sourceStats.isDirectory()) await fs.cp(sourcePath, targetPath, { recursive: true })
-    else await fs.copyFile(sourcePath, targetPath)
+    else {
+      await fs.mkdir(path.dirname(targetPath), { recursive: true })
+      await fs.copyFile(sourcePath, targetPath)
+    }
   }
   for (const supplementalFile of ['THIRD_PARTY_NOTICES.md']) {
     try {
@@ -92,7 +105,9 @@ async function main() {
   try {
     const vendorStat = await fs.stat(vendorDir)
     if (vendorStat.isDirectory()) {
-      await fs.cp(vendorDir, path.join(stagingDir, 'vendor'), { recursive: true })
+      await fs.cp(vendorDir, path.join(stagingDir, 'vendor'), {
+        recursive: true
+      })
     }
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error
