@@ -48,6 +48,15 @@ plugins.json
 
 ## Current Plugins
 
+### Dynamic Island
+
+Plugin id: `com.bad0rang3.dynamic-island`
+
+Adds a configurable, audio-reactive player overlay at the top of the screen. It
+supports live DIY controls for colors, geometry, visible components, animation
+speed, expansion behavior and visibility. Requires a Twilight Echo build with
+the host overlay API. See `plugins/dynamic-island/README.md` for details.
+
 ### Bilibili Favorites Provider
 
 Plugin id: `com.twilightecho.provider.bilibili`

@@ -15,6 +15,7 @@
     "pack:qqmusic": "node scripts/pack-plugin.cjs qqmusic-provider && pnpm run index",
     "pack:kugou": "node scripts/pack-plugin.cjs kugou-provider && pnpm run index",
     "pack:qishui": "node scripts/pack-plugin.cjs qishui-provider && pnpm run index",
+    "pack:dynamic-island": "node scripts/pack-plugin.cjs dynamic-island && pnpm run index",
     "build:kugou-vendor": "node scripts/build-kugou-vendor.mjs"
   },
   "devDependencies": {
