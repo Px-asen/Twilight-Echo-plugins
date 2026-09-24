@@ -88,6 +88,7 @@ export async function activate(context) {
     description: '自定义灵动岛的外观、尺寸、显示内容与交互方式',
     icon: 'pi pi-palette',
     command: OPEN_SETTINGS_COMMAND,
+    settingsSection: 'appearance',
     autoLoad: true
   })
 

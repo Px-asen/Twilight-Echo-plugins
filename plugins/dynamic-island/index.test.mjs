@@ -49,6 +49,7 @@ test('activation registers the player button and live DIY settings panel', async
       ]
     )
     assert.equal(contributions[1].autoLoad, true)
+    assert.equal(contributions[1].settingsSection, 'appearance')
     assert.equal(overlayCalls.some(([method]) => method === 'show'), true)
 
     const form = await commands.get('dynamic-island.settings.open')()
