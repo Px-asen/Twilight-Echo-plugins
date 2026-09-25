@@ -169,7 +169,7 @@
     {
       "id": "com.twilightecho.provider.qqmusic",
       "name": "QQ 音乐音源",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "description": "QQ 音乐每日推荐、巅峰飙升榜、热歌榜与精选歌单，支持发现分类、搜索、歌词、原生扫码登录和用户歌单。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -190,8 +190,8 @@
       ],
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.qqmusic-0.3.1.tep",
-      "checksumSha256": "b71fda7d038e95db6fde6619a7515f978bcdc3bc02367f335deb94a179420a1e",
+      "sourceUrl": "packages/com.twilightecho.provider.qqmusic-0.3.2.tep",
+      "checksumSha256": "670693c62ba0eb6cd6ae1b7ee1af46fd8700bfdf032fce22022211dbb849fcd8",
       "tags": [
         "provider",
         "ui",

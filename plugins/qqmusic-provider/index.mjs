@@ -744,18 +744,24 @@ function startNativeQrListener(qrcodeId, onEvent, ttlMs, externalSignal) {
 
 async function connectNativeQrMqtt(qrcodeId, signal) {
   let endpoint = NATIVE_QR_MQTT_URL
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     const connection = await openNativeMqttConnection(endpoint, signal)
-    connection.socket.send(createNativeMqttConnectPacket(qrcodeId))
-    const packet = await connection.queue.next(NATIVE_QR_MQTT_TIMEOUT_MS)
-    const connack = parseNativeMqttConnack(packet)
-    if (connack.reasonCode === 0) return connection
-    const redirected = nativeMqttRedirectUrl(connack.serverReference)
+    let accepted = false
+    let redirected = ''
     try {
-      connection.socket.close()
-    } catch {}
-    if (!redirected || attempt > 0 || ![0x9c, 0x9d].includes(connack.reasonCode)) {
-      throw new Error(`QQ 音乐二维码连接被拒绝（MQTT ${connack.reasonCode}）`)
+      connection.socket.send(createNativeMqttConnectPacket(qrcodeId))
+      const packet = await connection.queue.next(NATIVE_QR_MQTT_TIMEOUT_MS)
+      const connack = parseNativeMqttConnack(packet)
+      if (connack.reasonCode === 0) {
+        accepted = true
+        return connection
+      }
+      redirected = nativeMqttRedirectUrl(endpoint, connack.serverReference)
+      if (!redirected || attempt === 3 || ![0x9c, 0x9d].includes(connack.reasonCode)) {
+        throw new Error(`QQ 音乐二维码连接被拒绝（MQTT ${connack.reasonCode}）`)
+      }
+    } finally {
+      if (!accepted) connection.socket.close()
     }
     endpoint = redirected
   }
@@ -1198,19 +1204,15 @@ function nativeMqttReadProperties(buffer, start) {
   return result
 }
 
-function nativeMqttRedirectUrl(value) {
+function nativeMqttRedirectUrl(endpoint, value) {
   const reference = String(value || '').trim()
-  if (!reference) return ''
-  if (/^wss?:\/\//i.test(reference)) {
-    try {
-      const url = new URL(reference)
-      return url.protocol === 'wss:' || url.protocol === 'ws:' ? url.href : ''
-    } catch {
-      return ''
-    }
-  }
-  if (!/^[a-z0-9.-]+(?::\d+)?(?:\/[^\s]*)?$/i.test(reference)) return ''
-  return `wss://${reference}`
+  if (!/^[a-z0-9.-]+:\d+$/i.test(reference)) return ''
+  const url = new URL(endpoint)
+  const path = url.pathname.replace(/\/$/, '').split('/')
+  if (path.at(-1)?.includes(':')) path.pop()
+  path.push(reference)
+  url.pathname = path.join('/')
+  return url.href
 }
 
 function createNativeMqttQueue() {
