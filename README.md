@@ -54,8 +54,11 @@ Plugin id: `com.bad0rang3.dynamic-island`
 
 Adds a configurable, audio-reactive player overlay at the top of the screen. It
 supports live DIY controls for colors, geometry, visible components, animation
-speed, expansion behavior and visibility. Requires a Twilight Echo build with
-the host overlay API. See `plugins/dynamic-island/README.md` for details.
+speed, expansion behavior and visibility. Requires Twilight Echo `1.2.3` or
+higher with the host overlay API; on builds without that API it still installs,
+shows an "overlay unavailable, the island will not display" notice (a host
+toast when `twilight.ui.notify` is available, plus the settings entry and log)
+and never fails to activate. See `plugins/dynamic-island/README.md` for details.
 
 ### Bilibili Favorites Provider
 

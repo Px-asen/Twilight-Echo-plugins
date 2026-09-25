@@ -15,8 +15,18 @@
 
 ## 兼容性
 
-需要 Twilight Echo `1.3.0` 或更高版本，并依赖宿主的 Overlay API。对应宿主
+需要 Twilight Echo `1.2.3` 或更高版本，并依赖宿主的 Overlay API。对应宿主
 实现见 [`Twilight_Echo` #91](https://github.com/Px-asen/Twilight_Echo/pull/91)。
+
+插件在激活时会探测 `twilight.overlay`：如果当前构建没有该 API（例如未包含
+灵动岛宿主支持的旧版本），插件仍然可以安装并不会激活失败，同时会给出
+「灵动岛不会显示」的提示：
+
+- 宿主提供 `ui.notify`（API v3 新增）时弹出一次 toast；
+- 在 `设置 → 常规 → 插件设置` 的「灵动岛 DIY（当前版本不支持）」条目里始终可见；
+- 写入插件日志，便于排查。
+
+升级到包含 Overlay API 的构建后即可正常使用。
 
 ## 使用
 

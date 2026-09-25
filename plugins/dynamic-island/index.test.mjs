@@ -68,3 +68,78 @@ test('activation registers the player button and live DIY settings panel', async
     await deactivate()
   }
 })
+
+test('activation degrades gracefully when the host lacks the overlay API', async () => {
+  const commands = new Map()
+  const contributions = []
+  const warnings = []
+  const notices = []
+  const context = {
+    settings: {
+      get: async () => undefined,
+      set: async () => undefined
+    },
+    logger: {
+      warn: (message) => warnings.push(message)
+    },
+    twilight: {
+      // Older Twilight Echo builds do not expose `twilight.overlay` at all.
+      ui: {
+        onCommand: (name, handler) => commands.set(name, handler),
+        register: async (contribution) => contributions.push(contribution),
+        notify: async (notice) => notices.push(notice)
+      }
+    }
+  }
+
+  await activate(context)
+  try {
+    assert.deepEqual(
+      contributions.map(({ id, kind }) => [id, kind]),
+      [
+        ['dynamic-island-toggle', 'playerBarButton'],
+        ['dynamic-island-diy', 'settingsPanel']
+      ]
+    )
+    // The settings entry itself advertises that the island cannot render.
+    for (const contribution of contributions) {
+      assert.match(contribution.title, /当前版本不支持/)
+      assert.match(contribution.description, /灵动岛不会显示/)
+    }
+    for (const command of [
+      'dynamic-island.toggle',
+      'dynamic-island.settings.open',
+      SAVE_SETTINGS_COMMAND,
+      RESET_SETTINGS_COMMAND
+    ]) {
+      assert.match(await commands.get(command)(), /灵动岛不会显示/)
+    }
+    assert.equal(warnings.length, 1)
+    assert.match(warnings[0], /灵动岛不会显示/)
+    assert.equal(notices.length, 1)
+    assert.equal(notices[0].kind, 'warning')
+    assert.match(notices[0].message, /灵动岛不会显示/)
+  } finally {
+    await deactivate()
+  }
+})
+
+test('activation still works when the host has neither overlay nor notify', async () => {
+  const contributions = []
+  const context = {
+    settings: {
+      get: async () => undefined,
+      set: async () => undefined
+    },
+    twilight: {
+      ui: {
+        onCommand: () => undefined,
+        register: async (contribution) => contributions.push(contribution)
+      }
+    }
+  }
+
+  await assert.doesNotReject(() => activate(context))
+  assert.equal(contributions.length, 2)
+  await deactivate()
+})
