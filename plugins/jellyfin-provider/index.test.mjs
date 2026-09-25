@@ -27,7 +27,8 @@ async function fixture(run) {
         Artists: ['Artist'],
         Album: 'Album',
         RunTimeTicks: 1800000000,
-        ImageTags: { Primary: 'image-tag' }
+        ImageTags: { Primary: 'image-tag' },
+        MediaStreams: [{ Type: 'Audio', Channels: 2, ChannelLayout: 'stereo' }]
       })),
       TotalRecordCount: 101
     })
@@ -92,6 +93,10 @@ test('search and playlist pagination map tracks and preserve server-scoped ident
     assert.equal(page.total, 101)
     assert.equal(page.items.length, 2)
     assert.equal(page.items[0].duration, 180)
+    assert.equal(page.items[0].channels, 2)
+    assert.equal(page.items[0].channelCount, 2)
+    assert.equal(page.items[0].channelLayout, 'stereo')
+    assert.equal(page.items[0].mediaInfo.channels, 2)
     assert.equal(calls.at(-1).url.searchParams.get('SearchTerm'), '歌曲 & title')
     assert.equal(calls.at(-1).url.searchParams.get('StartIndex'), '10')
     const stream = new URL(await provider.getPlaybackUrl(page.items[0]))
