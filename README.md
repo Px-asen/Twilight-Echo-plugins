@@ -1,17 +1,29 @@
 # Twilight Echo Plugins
 
-This repository hosts Twilight Echo plugins and the static plugin index used by
-the app's plugin marketplace.
+This repository hosts the `plugins.json` directory used by Twilight Echo's in-app marketplace. Its `plugins/` and `packages/` folders contain plugins maintained here. Independent developers keep their source code, README, and release assets in their own public repositories.
 
-## Submit an independent plugin
+## Publish an independent plugin
 
-The easiest path is automatic community discovery: publish one `.tep` asset in the latest GitHub Release of a public plugin repository, set its repository topic to `twilight-echo-plugin`, and wait for the scheduled catalog scan. The `.tep` file must be named `<plugin-id>-<version>.tep`; the release tag must be `<version>` or `v<version>`, and `plugin.json.repository` must equal that GitHub repository URL. Community entries appear as unverified. The scheduled scan updates `community.json` and `plugins.json` every six hours; GitHub Actions scheduling may be delayed. The catalog repository must allow GitHub Actions to write to its default branch for automatic publishing.
+You do not need to fork this directory or submit a pull request for automatic discovery:
 
-Maintainers may still review a plugin through the pull request process below. Reviewed entries in `catalog/` take precedence over automatically discovered entries with the same plugin ID.
+1. Create a public GitHub repository for your plugin. Keep its source and a README there. Set `plugin.json.repository` to its exact URL, for example `https://github.com/example/twilight-lyrics` (no trailing slash).
+2. Build a `.tep` package with `plugin.json` at the archive root. Name it `<plugin-id>-<version>.tep`, matching the manifest exactly. See the [plugin development guide](https://github.com/Px-asen/Twilight_Echo/blob/Pxasen/docs/PLUGIN_README.md) for a complete manifest and packaging command.
+3. Create a GitHub Release tagged `<version>` or `v<version>`. Attach **exactly one** `.tep` asset, no larger than 50 MiB. Add the repository Topic `twilight-echo-plugin`.
+4. The [discovery workflow](.github/workflows/community-discovery.yml) scans the latest Release every six hours and updates `community.json` and `plugins.json`. Once the entry appears in [`plugins.json`](plugins.json), users can refresh the Extension Center and search for it. The scheduled run may be delayed.
 
-Publish the plugin source and README in your own public repository. Attach `<plugin-id>-<version>.tep` to a GitHub Release, then submit a pull request adding `catalog/<plugin-id>.json` and the regenerated `plugins.json`. The descriptor format and review steps are in [catalog/README.md](catalog/README.md). Run `pnpm run index` and `pnpm run validate:index` before submitting. The pull request workflow downloads the release asset to check its SHA-256 and packaged manifest; maintainers review permissions and basic functionality before merging.
+Automatic entries have the `community` tag and display as **unverified**. The scanner checks the package, URL, manifest, and size; it does not execute plugin code or perform a human review. A plugin ID stays bound to its first discovered repository, so publish updates from the same repository with an increased version. Replacing a package without changing its version is rejected. Invalid or missing releases are omitted until fixed.
 
-The existing `plugins/` and `packages/` folders continue to hold plugins maintained in this repository. Independent developers retain their source and release assets in their own repositories.
+## Enable automatic discovery (directory maintainers)
+
+In this repository's **Settings → Actions → General**, enable Actions and set **Workflow permissions** to **Read and write permissions**. The `Discover community plugins` workflow runs on `main` every six hours and can also be started from the **Actions** tab with **Run workflow**. It uses the repository's built-in `GITHUB_TOKEN`; no separate secret is needed. The workflow commits changed `community.json` and `plugins.json` directly to `main`, so branch rules must permit that push. Check the workflow run and the generated index after enabling it.
+
+## Request a reviewed listing
+
+If you want a human-reviewed listing, submit a pull request with `catalog/<plugin-id>.json` and the regenerated `plugins.json`. Follow [catalog/README.md](catalog/README.md). The pull request workflow checks the package and index; maintainers review its README, permissions, and basic behavior. Reviewed catalog entries take precedence over automatic entries with the same ID. Review alone does not grant the “officially verified” badge, which requires a valid publisher signature.
+
+## Update an existing plugin
+
+Increase `plugin.json.version`, rebuild the `.tep`, and publish a new Release in the same repository with the matching tag and filename. The next discovery run replaces the previous community entry. For a reviewed listing, also update `catalog/<plugin-id>.json` and `plugins.json` in a new pull request. Do not edit `community.json` by hand.
 
 ## Repository Layout
 
@@ -49,11 +61,15 @@ packages/
   com.twilightecho.provider.qqmusic-0.3.2.tep
   com.twilightecho.provider.kugou-0.2.3.tep
   com.twilightecho.provider.ytmusic-1.0.5.tep
+catalog/                   # reviewed independent plugins, one JSON file per plugin
+community.json             # automatically discovered plugins and ID ownership history
 plugins.json
 ```
 
 - `plugins/<name>/` contains plugin source code.
 - `packages/` contains installable `.tep` packages.
+- `catalog/` contains reviewed listings for independent repositories.
+- `community.json` is maintained by the discovery workflow.
 - `plugins.json` is the schemaVersion 1 plugin index consumed by Twilight Echo.
 
 ## Current Plugins
