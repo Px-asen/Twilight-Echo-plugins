@@ -10,6 +10,7 @@
     "test": "node --test plugins/*/*.test.mjs scripts/*.test.mjs",
     "index": "node scripts/generate-index.mjs",
     "validate:index": "node scripts/generate-index.mjs --validate",
+    "discover": "node scripts/discover-community.mjs",
     "pack": "node scripts/pack-plugin.cjs bilibili-provider && pnpm run index",
     "pack:bilibili": "node scripts/pack-plugin.cjs bilibili-provider && pnpm run index",
     "pack:qqmusic": "node scripts/pack-plugin.cjs qqmusic-provider && pnpm run index",

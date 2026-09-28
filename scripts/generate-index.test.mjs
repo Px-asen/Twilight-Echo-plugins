@@ -201,6 +201,135 @@ test('rejects packages without plugin README and bundled plugin ids', async () =
   await assert.rejects(() => generatePluginIndex({ repoRoot: bundledRoot }), /内置/)
 })
 
+test('merges release packages from two independent publishers', async () => {
+  const root = await createRepoFixture()
+  await createPluginPackage(root, manifest)
+  const alice = await createExternalSubmission(root, {
+    ...manifest,
+    id: 'com.alice.lyrics',
+    name: 'Lyrics',
+    author: 'Alice',
+    repository: 'https://github.com/alice/lyrics'
+  })
+  const bob = await createExternalSubmission(root, {
+    ...manifest,
+    id: 'org.bob.radio',
+    name: 'Radio',
+    author: 'Bob',
+    repository: 'https://github.com/bob/radio'
+  })
+  const fetchImpl = releaseFetch(new Map([[alice.url, alice.bytes], [bob.url, bob.bytes]]))
+  const index = await generatePluginIndex({ repoRoot: root, fetchImpl, write: true })
+  assert.equal(index.plugins.length, 3)
+  assert.deepEqual(index.plugins.filter((entry) => entry.id !== manifest.id).map((entry) => entry.author), [
+    'Alice',
+    'Bob'
+  ])
+  await generatePluginIndex({ repoRoot: root, fetchImpl, validateOnly: true })
+})
+
+test('rejects duplicate external ids, checksum mismatch, manifest mismatch and unavailable assets', async () => {
+  const root = await createRepoFixture()
+  const externalManifest = { ...manifest, repository: 'https://github.com/alice/plugin' }
+  const submission = await createExternalSubmission(root, externalManifest)
+  await createPluginPackage(root, externalManifest)
+  await assert.rejects(
+    () => generatePluginIndex({ repoRoot: root, fetchImpl: releaseFetch(new Map([[submission.url, submission.bytes]])) }),
+    /重复插件 id/
+  )
+
+  const secondRoot = await createRepoFixture()
+  const second = await createExternalSubmission(secondRoot, externalManifest)
+  const descriptorPath = join(secondRoot, 'catalog', `${externalManifest.id}.json`)
+  const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'))
+  descriptor.checksumSha256 = '0'.repeat(64)
+  await writeFile(descriptorPath, JSON.stringify(descriptor))
+  await assert.rejects(
+    () => generatePluginIndex({ repoRoot: secondRoot, fetchImpl: releaseFetch(new Map([[second.url, second.bytes]])) }),
+    /SHA-256 不匹配/
+  )
+  descriptor.checksumSha256 = createHash('sha256').update(second.bytes).digest('hex')
+  descriptor.id = 'com.alice.different'
+  await writeFile(descriptorPath, JSON.stringify(descriptor))
+  await assert.rejects(
+    () => generatePluginIndex({ repoRoot: secondRoot, fetchImpl: releaseFetch(new Map([[second.url, second.bytes]])) }),
+    /文件名不匹配/
+  )
+  descriptor.id = externalManifest.id
+  descriptor.version = '1.2.4'
+  descriptor.sourceUrl = `${externalManifest.repository}/releases/download/v1.2.4/${externalManifest.id}-1.2.4.tep`
+  await writeFile(descriptorPath, JSON.stringify(descriptor))
+  await assert.rejects(
+    () => generatePluginIndex({ repoRoot: secondRoot, fetchImpl: releaseFetch(new Map([[descriptor.sourceUrl, second.bytes]])) }),
+    /收录记录与包内 manifest 不一致/
+  )
+  await assert.rejects(
+    () => generatePluginIndex({ repoRoot: secondRoot, fetchImpl: releaseFetch(new Map()) }),
+    /下载失败/
+  )
+})
+
+test('rejects a version rollback and a change of publisher repository', async () => {
+  const root = await createRepoFixture()
+  const published = { ...manifest, repository: 'https://github.com/alice/plugin' }
+  const submission = await createExternalSubmission(root, published)
+  const baselineIndexPath = join(root, 'baseline.json')
+  const baseline = {
+    plugins: [{ id: published.id, version: '2.0.0', repository: published.repository }]
+  }
+  await writeFile(baselineIndexPath, JSON.stringify(baseline))
+  await assert.rejects(
+    () => generatePluginIndex({ repoRoot: root, baselineIndexPath, fetchImpl: releaseFetch(new Map([[submission.url, submission.bytes]])) }),
+    /版本不能回退/
+  )
+  baseline.plugins[0].version = '1.0.0'
+  baseline.plugins[0].repository = 'https://github.com/another/plugin'
+  await writeFile(baselineIndexPath, JSON.stringify(baseline))
+  await assert.rejects(
+    () => generatePluginIndex({ repoRoot: root, baselineIndexPath, fetchImpl: releaseFetch(new Map([[submission.url, submission.bytes]])) }),
+    /发布仓库不能/
+  )
+})
+
+test('treats a prerelease as older than its stable version', async () => {
+  const root = await createRepoFixture()
+  const published = {
+    ...manifest,
+    version: '1.2.3-beta.2',
+    repository: 'https://github.com/alice/plugin'
+  }
+  const submission = await createExternalSubmission(root, published)
+  const baselineIndexPath = join(root, 'baseline.json')
+  await writeFile(baselineIndexPath, JSON.stringify({
+    plugins: [{ id: published.id, version: '1.2.3', repository: published.repository }]
+  }))
+  await assert.rejects(
+    () => generatePluginIndex({
+      repoRoot: root,
+      baselineIndexPath,
+      fetchImpl: releaseFetch(new Map([[submission.url, submission.bytes]]))
+    }),
+    /版本不能回退/
+  )
+})
+
+test('rejects an oversized external release before reading its body', async () => {
+  const root = await createRepoFixture()
+  const submission = await createExternalSubmission(root, {
+    ...manifest,
+    repository: 'https://github.com/alice/plugin'
+  })
+  await assert.rejects(
+    () => generatePluginIndex({
+      repoRoot: root,
+      fetchImpl: async () => new Response(submission.bytes, {
+        headers: { 'content-length': String(50 * 1024 * 1024 + 1) }
+      })
+    }),
+    /超过 50 MB/
+  )
+})
+
 async function createRepoFixture() {
   const root = await mkdtemp(join(tmpdir(), 'twilight-plugin-index-generator-'))
   await mkdir(join(root, 'packages'), { recursive: true })
@@ -228,4 +357,35 @@ async function createPluginPackage(root, pluginManifest, options = {}) {
   )
   await createZip(stagingDir, packagePath)
   return packagePath
+}
+
+async function createExternalSubmission(root, pluginManifest) {
+  const staging = join(root, '.cache', `external-${pluginManifest.id}`)
+  await mkdir(staging, { recursive: true })
+  await mkdir(join(root, 'catalog'), { recursive: true })
+  await writeFile(join(staging, 'plugin.json'), JSON.stringify(pluginManifest))
+  await writeFile(join(staging, 'index.mjs'), 'export function activate() {}')
+  const packagePath = join(staging, `${pluginManifest.id}-${pluginManifest.version}.tep`)
+  await createZip(staging, packagePath)
+  const bytes = await readFile(packagePath)
+  const url = `${pluginManifest.repository}/releases/download/v${pluginManifest.version}/${pluginManifest.id}-${pluginManifest.version}.tep`
+  await writeFile(
+    join(root, 'catalog', `${pluginManifest.id}.json`),
+    JSON.stringify({
+      id: pluginManifest.id,
+      version: pluginManifest.version,
+      repository: pluginManifest.repository,
+      sourceUrl: url,
+      checksumSha256: createHash('sha256').update(bytes).digest('hex'),
+      tags: ['tool']
+    })
+  )
+  return { url, bytes }
+}
+
+function releaseFetch(packages) {
+  return async (url) => {
+    const bytes = packages.get(url)
+    return bytes ? new Response(bytes) : new Response('', { status: 404 })
+  }
 }

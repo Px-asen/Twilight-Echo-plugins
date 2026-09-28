@@ -1,0 +1,31 @@
+name: Plugin catalog
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: Px-asen/Twilight_Echo
+          path: host
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: git show "$BASE_SHA:plugins.json" > "$RUNNER_TEMP/plugins-main.json"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - run: pnpm test
+        env:
+          TWILIGHT_ECHO_ROOT: ${{ github.workspace }}/host
+      - run: node scripts/generate-index.mjs --validate --baseline "$RUNNER_TEMP/plugins-main.json"

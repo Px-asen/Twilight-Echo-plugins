@@ -3,6 +3,16 @@
 This repository hosts Twilight Echo plugins and the static plugin index used by
 the app's plugin marketplace.
 
+## Submit an independent plugin
+
+The easiest path is automatic community discovery: publish one `.tep` asset in the latest GitHub Release of a public plugin repository, set its repository topic to `twilight-echo-plugin`, and wait for the scheduled catalog scan. The `.tep` file must be named `<plugin-id>-<version>.tep`; the release tag must be `<version>` or `v<version>`, and `plugin.json.repository` must equal that GitHub repository URL. Community entries appear as unverified. The scheduled scan updates `community.json` and `plugins.json` every six hours; GitHub Actions scheduling may be delayed. The catalog repository must allow GitHub Actions to write to its default branch for automatic publishing.
+
+Maintainers may still review a plugin through the pull request process below. Reviewed entries in `catalog/` take precedence over automatically discovered entries with the same plugin ID.
+
+Publish the plugin source and README in your own public repository. Attach `<plugin-id>-<version>.tep` to a GitHub Release, then submit a pull request adding `catalog/<plugin-id>.json` and the regenerated `plugins.json`. The descriptor format and review steps are in [catalog/README.md](catalog/README.md). Run `pnpm run index` and `pnpm run validate:index` before submitting. The pull request workflow downloads the release asset to check its SHA-256 and packaged manifest; maintainers review permissions and basic functionality before merging.
+
+The existing `plugins/` and `packages/` folders continue to hold plugins maintained in this repository. Independent developers retain their source and release assets in their own repositories.
+
 ## Repository Layout
 
 ```text
