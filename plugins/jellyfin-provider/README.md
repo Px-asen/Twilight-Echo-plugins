@@ -4,12 +4,15 @@
 
 支持分页搜索、最新音乐、全部音乐、服务器歌单、封面和音频播放。服务器和账号访问权限由 Jellyfin 决定。密码只用于登录请求；插件私有设置保存服务器地址、用户 ID 和会话令牌，退出登录清除这些信息。切换服务器后，旧服务器曲目不会被误发到新服务器。
 
+插件声明 `network`、`settings` 和 `library:read` 权限；注册 `library` Provider 能力时，宿主要求显式声明 `library:read`。0.1.1 补齐该声明，修复 0.1.0 在安装或启用时提示「未声明 library:read 权限」的问题。安装修复版请刷新插件市场并更新至 0.1.1，或从本地安装新版 `.tep`。
+
 网络请求使用服务器原有 HTTP(S) 配置，不跳过证书校验；带凭据的 API 请求不自动跟随重定向。音频与封面地址通过宿主媒体授权路径使用。
 
 接口依据 Jellyfin 官方 API：
+
 - https://kotlin-sdk.jellyfin.org/guide/authentication.html
 - https://typescript-sdk.jellyfin.org/classes/generated-client.AudioApi.html
 
-验证：`node --test plugins/jellyfin-provider/index.test.mjs`。用例覆盖登录、重启恢复、失败登录、分页、播放地址和取消操作。尚无报告者的 Jellyfin 12 实例，具体版本兼容性与真实音频播放待服务器联调确认。
+验证：`node --test plugins/jellyfin-provider/index.test.mjs`。用例覆盖 Provider 权限声明、源码与市场安装包和索引的一致性、包 SHA-256、登录、重启恢复、失败登录、分页、播放地址和取消操作。尚无报告者的 Jellyfin 12 实例，具体版本兼容性与真实音频播放待服务器联调确认。
 
-构建：`node scripts/pack-plugin.cjs jellyfin-provider --twilight-root D:/Twilight_Echo-Pxasen`。插件源码不放入播放器主仓库。
+构建：`node scripts/pack-plugin.cjs jellyfin-provider --twilight-root D:/Twilight_Echo-Pxasen`，再运行 `pnpm run index` 与 `pnpm run validate:index`。发布时将 `packages/com.twilightecho.provider.jellyfin-0.1.1.tep` 和更新后的 `plugins.json` 一起提交，保留已发布的旧版本包。插件源码不放入播放器主仓库。

@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import { activate } from './index.mjs'
+
+const manifest = JSON.parse(await readFile(new URL('./plugin.json', import.meta.url), 'utf8'))
 
 async function fixture(run) {
   const calls = []
@@ -62,6 +69,43 @@ async function fixture(run) {
     globalThis.fetch = originalFetch
   }
 }
+
+test('manifest declares the permissions required by the registered library provider', async () =>
+  fixture(async ({ provider }) => {
+    assert.equal(provider.id, 'jellyfin')
+    assert.ok(provider.capabilities.includes('library'))
+    for (const permission of ['network', 'settings', 'library:read']) {
+      assert.ok(manifest.permissions.includes(permission), `Missing ${permission} permission`)
+    }
+  }))
+
+test('marketplace package and index match the source manifest and package checksum', async () => {
+  const index = JSON.parse(await readFile(new URL('../../plugins.json', import.meta.url), 'utf8'))
+  const entry = index.plugins.find((plugin) => plugin.id === manifest.id)
+  assert.ok(entry)
+  assert.equal(entry.version, manifest.version)
+  assert.deepEqual(entry.permissions, manifest.permissions)
+  assert.equal(entry.sourceUrl, `packages/${manifest.id}-${manifest.version}.tep`)
+  const archive = new URL(`../../${entry.sourceUrl}`, import.meta.url)
+  assert.equal(
+    entry.checksumSha256,
+    createHash('sha256')
+      .update(await readFile(archive))
+      .digest('hex')
+  )
+  const executable =
+    process.platform === 'linux'
+      ? 'unzip'
+      : process.platform === 'win32'
+        ? 'C:/Windows/System32/tar.exe'
+        : 'tar'
+  const args =
+    process.platform === 'linux'
+      ? ['-p', fileURLToPath(archive), 'plugin.json']
+      : ['-xOf', fileURLToPath(archive), 'plugin.json']
+  const { stdout } = await promisify(execFile)(executable, args)
+  assert.deepEqual(JSON.parse(stdout), manifest)
+})
 
 test('server login persists only the session and survives a host restart', async () =>
   fixture(async ({ provider, calls, settings, restart }) => {
