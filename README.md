@@ -218,6 +218,53 @@ The index uses relative package URLs such as
 `packages/com.twilightecho.provider.bilibili-0.1.13.tep`, so Twilight Echo
 resolves the package from the same GitHub raw base URL.
 
+## Deploy to EdgeOne Makers
+
+在 EdgeOne Makers 控制台新建项目，选择 **导入 Git 仓库**，授权 GitHub 后导入
+`Px-asen/Twilight-Echo-plugins`。生产分支选择 `main`，开启自动部署，并使用以下设置：
+
+| 配置项 | 值 |
+| --- | --- |
+| 框架 | Other（其他 / 静态站点） |
+| 根目录 | `./` |
+| Node.js | `24.18.0` |
+| 安装命令 | `pnpm install --frozen-lockfile` |
+| 构建命令 | `pnpm run build:edgeone` |
+| 输出目录 | `dist` |
+
+仓库根目录的 [`edgeone.json`](edgeone.json) 使用[官方支持的配置格式](https://pages.edgeone.ai/document/edgeone-json)，
+已设置构建、安装、输出目录和 Node.js 版本，以及 `plugins.json` 的 60 秒浏览器缓存、
+`packages/*.tep` 的一年缓存与 `immutable`。发布新版插件时必须增加版本号并使用新的包文件名，避免旧缓存。
+EdgeOne 的[边缘缓存会在新部署后自动失效](https://pages.edgeone.ai/document/configuring-cache)。
+
+本地执行 `pnpm run build:edgeone` 会生成可直接部署的静态目录：
+
+```text
+dist/
+  index.html
+  plugins.json
+  packages/*.tep
+```
+
+构建原样复制已提交的索引及其引用的本地包，并验证包存在、SHA-256 一致及
+[25 MB 单文件限制](https://pages.edgeone.ai/document/limits-and-quotas)（保守按 25,000,000 字节检查，超限报错）。
+不会重新生成索引、打包、签名或运行 community discovery，也不会发布源码、scripts、catalog、
+`.github`、未被引用的历史包和本地预览包。外部 community/catalog 下载 URL 保持原样，不会被镜像。
+
+部署成功后，将下面的 `YOUR_DOMAIN` 替换为控制台显示的生产域名或绑定的自定义域名：
+
+```sh
+curl -i https://YOUR_DOMAIN/plugins.json
+curl -I https://YOUR_DOMAIN/packages/com.twilightecho.provider.bilibili-0.1.13.tep
+curl -fL https://YOUR_DOMAIN/packages/com.twilightecho.provider.bilibili-0.1.13.tep -o bilibili.tep
+```
+
+确认索引返回 HTTP 200 和 JSON，包返回 HTTP 200、上述缓存头且可下载；下载文件的 SHA-256
+应与索引中的 `checksumSha256` 一致（Windows 可用 `Get-FileHash ./bilibili.tep -Algorithm SHA256`）。
+包文件名以当前 `/plugins.json` 的 `sourceUrl` 为准。客户端索引地址设置为
+`https://YOUR_DOMAIN/plugins.json`，本地包会自动从同域名的 `/packages/` 下载。
+用于国内访问时，在控制台选择覆盖中国大陆的加速区域，并按平台要求绑定已备案的自定义域名。
+
 ## Use From Your Own Server
 
 You can host the same files on any HTTPS server:
