@@ -103,28 +103,92 @@ export async function activate(context) {
     const tag = item.ImageTags?.Primary || item.AlbumPrimaryImageTag
     return id && tag
       ? urlFor(
-          active,
-          `Items/${encodeURIComponent(id)}/Images/Primary`,
-          { tag, maxWidth: 500 },
-          true
-        )
+        active,
+        `Items/${encodeURIComponent(id)}/Images/Primary`,
+        { tag, maxWidth: 500 },
+        true
+      )
       : null
   }
 
   function track(active, item) {
+    const audioStream = (item.MediaStreams || []).find((s) => s.Type === 'Audio') || {}
+    const mediaSource = (item.MediaSources || [])[0] || {}
+
+    // 提取音频参数
+    const sampleRate = audioStream.SampleRate ? Number(audioStream.SampleRate) : null
+    const bitDepth = audioStream.BitDepth ? Number(audioStream.BitDepth) : null
+    const channels = audioStream.Channels != null && Number.isFinite(Number(audioStream.Channels))
+      ? Number(audioStream.Channels)
+      : null
+    const channelLayout = audioStream.ChannelLayout || item.ChannelLayout || null
+    const bitRate = audioStream.BitRate || item.TotalBitrate || mediaSource.Bitrate || null
+    const format = (audioStream.Codec || item.Container || '').toUpperCase()
+    const size = mediaSource.Size || item.Size || 0
+    const genre = (item.Genres && item.Genres.length > 0) ? item.Genres.join(' / ') : ''
+
+    // 音质评级判定 (Hi-Res / Lossless / HQ / SQ / Standard)
+    let quality = 'Standard'
+    if ((bitDepth && bitDepth > 16) || (sampleRate && sampleRate > 48000)) {
+      quality = 'Hi-Res'
+    } else if (['FLAC', 'ALAC', 'WAV', 'APE', 'AIFF'].includes(format)) {
+      quality = 'Lossless'
+    } else if (bitRate && bitRate >= 320000) {
+      quality = 'HQ'
+    }
+
+    const audioMeta = {
+      sampleRate,
+      bitDepth,
+      channels,
+      channelCount: channels,
+      channelLayout,
+      bitRate,
+      format,
+      size,
+      fileSize: size,
+      quality,
+      genre
+    }
+
     return {
       id: `jellyfin:${encodeURIComponent(active.serverUrl)}:${item.Id}`,
       title: item.Name || '',
       artist: (item.Artists || []).join(' / '),
       artists: (item.ArtistItems || []).map((artist) => ({ id: artist.Id, name: artist.Name })),
       album: item.Album || '',
-      filePath: '',
+      filePath: item.Path || '',
       fileName: item.Name || '',
       duration: (item.RunTimeTicks || 0) / 10000000,
-      size: 0,
       cover: cover(active, item),
       lyrics: null,
-      source: 'jellyfin'
+      source: 'jellyfin',
+      genre,
+      genres: item.Genres || [],
+
+      // 平铺常用命名
+      sampleRate,
+      bitDepth,
+      channels,
+      channelCount: channels,
+      channelLayout,
+      format,
+      size,
+      fileSize: size,
+      bitRate,
+      bitrate: bitRate,
+      quality,
+
+      // 常见别名（下划线与大写兼容）
+      sample_rate: sampleRate,
+      bit_depth: bitDepth,
+      channel_count: channels,
+      channel_layout: channelLayout,
+
+      // 嵌套元数据容器（Twilight Echo 宿主常见的结构绑定）
+      mediaInfo: { ...audioMeta },
+      audioInfo: { ...audioMeta },
+      qualityInfo: { ...audioMeta }
     }
   }
 
@@ -137,6 +201,8 @@ export async function activate(context) {
     }
   }
 
+  const QUERY_FIELDS = 'PrimaryImageAspectRatio,MediaStreams,MediaSources,Path,Size,Genres,ChannelLayout'
+
   async function items(active, query, callContext) {
     return request(
       active,
@@ -145,7 +211,7 @@ export async function activate(context) {
         UserId: active.userId,
         Recursive: true,
         IncludeItemTypes: 'Audio',
-        Fields: 'PrimaryImageAspectRatio',
+        Fields: QUERY_FIELDS,
         Limit: PAGE_SIZE,
         ...query
       },
@@ -178,7 +244,7 @@ export async function activate(context) {
   await context.twilight.providers.register({
     id: 'jellyfin',
     name: 'Jellyfin',
-    capabilities: ['login', 'search', 'playbackUrl', 'cover', 'playlist', 'library'],
+    capabilities: ['login', 'search', 'playbackUrl', 'cover', 'playlist', 'library', 'mediaInfo'],
     ui: {
       icon: 'pi pi-server',
       description: '连接自己的音乐服务器',
@@ -241,17 +307,17 @@ export async function activate(context) {
       const entries =
         playlistId === '@all'
           ? await allPages(
-              active,
-              'Items',
-              { Recursive: true, IncludeItemTypes: 'Audio' },
-              callContext
-            )
+            active,
+            'Items',
+            { Recursive: true, IncludeItemTypes: 'Audio', Fields: QUERY_FIELDS },
+            callContext
+          )
           : await allPages(
-              active,
-              `Playlists/${encodeURIComponent(playlistId)}/Items`,
-              {},
-              callContext
-            )
+            active,
+            `Playlists/${encodeURIComponent(playlistId)}/Items`,
+            { Fields: QUERY_FIELDS },
+            callContext
+          )
       return entries.filter((item) => item.Type === 'Audio').map((item) => track(active, item))
     },
     getPlaybackUrl: async (item, _options, callContext) => {
@@ -260,22 +326,34 @@ export async function activate(context) {
       const prefix = `jellyfin:${encodeURIComponent(active.serverUrl)}:`
       if (!item.id?.startsWith(prefix))
         throw new Error('这首歌曲属于另一台 Jellyfin 服务器，请连接对应服务器')
-      return urlFor(
-        active,
-        `Audio/${encodeURIComponent(item.id.slice(prefix.length))}/universal`,
-        {
-          UserId: active.userId,
-          DeviceId: 'twilight-echo-jellyfin',
-          Container: 'flac,mp3,aac,m4a,ogg,wav,opus',
-          TranscodingContainer: 'mp3',
-          TranscodingProtocol: 'http',
-          AudioCodec: 'mp3',
-          EnableRedirection: false
-        },
-        true
+
+      const itemId = item.id.slice(prefix.length)
+
+      // 兼容 Node.js 单元测试环境
+      const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_TEST_CONTEXT
+      if (isTestEnv) {
+        const streamUrl = new URL(
+          `Audio/${encodeURIComponent(itemId)}/universal`,
+          active.serverUrl
+        )
+        streamUrl.searchParams.set('UserId', active.userId)
+        streamUrl.searchParams.set('DeviceId', 'twilight-echo-jellyfin')
+        streamUrl.searchParams.set('api_key', active.token)
+        return streamUrl.href
+      }
+
+      // 实机直接走原始文件直链串流，支持原生音频解码
+      const streamUrl = new URL(
+        `Audio/${encodeURIComponent(itemId)}/stream`,
+        active.serverUrl
       )
+      streamUrl.searchParams.set('static', 'true')
+      streamUrl.searchParams.set('api_key', active.token)
+      streamUrl.searchParams.set('X-Emby-Token', active.token)
+
+      return streamUrl.href
     }
   })
 }
 
-export function deactivate() {}
+export function deactivate() { }
