@@ -2,6 +2,221 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { activate, biliJson, deactivate } from "./index.mjs";
 
+test("opening a 3000-video folder loads one page, with no hidden prefetch or page cap", async (t) => {
+  const { provider, calls } = await harness(t, (url) => {
+    assert.equal(url.pathname, "/x/v3/fav/resource/list");
+    assert.equal(url.searchParams.get("ps"), "20");
+    const pn = Number(url.searchParams.get("pn"));
+    const response = page(
+      Array.from({ length: 20 }, (_, i) => media((pn - 1) * 20 + i + 1)),
+      pn < 150,
+    );
+    response.data.info.media_count = 3000;
+    return json(response);
+  });
+  const first = await provider.fetchPlaylistTracksPage("123");
+  assert.equal(first.tracks.length, 20);
+  assert.equal(first.nextOffset, 20);
+  assert.equal(first.total, null);
+  assert.equal(first.hasMore, true);
+  assert.equal(
+    calls.filter((url) => url.pathname.endsWith("/resource/list")).length,
+    1,
+  );
+  const last = await provider.fetchPlaylistTracksPage("123", 2980, 20);
+  assert.equal(last.tracks.at(-1).id, "bili:BV3000:3000");
+  assert.equal(last.hasMore, false);
+  assert.deepEqual(
+    calls
+      .filter((url) => url.pathname.endsWith("/resource/list"))
+      .map((url) => url.searchParams.get("pn")),
+    ["1", "150"],
+  );
+});
+
+test("a 250-video folder is read completely one requested page at a time", async (t) => {
+  const { provider, calls } = await harness(t, (url) => {
+    const pn = Number(url.searchParams.get("pn"));
+    const start = (pn - 1) * 20;
+    return json(
+      page(
+        Array.from({ length: Math.min(20, 250 - start) }, (_, i) =>
+          media(start + i + 1),
+        ),
+        pn < 13,
+      ),
+    );
+  });
+  let offset = 0;
+  const tracks = [];
+  for (let i = 0; i < 13; i++) {
+    const result = await provider.fetchPlaylistTracksPage("123", offset);
+    tracks.push(...result.tracks);
+    offset = result.nextOffset;
+    assert.equal(result.hasMore, i < 12);
+    assert.equal(
+      calls.filter((url) => url.pathname.endsWith("/resource/list")).length,
+      i + 1,
+    );
+  }
+  assert.deepEqual(
+    tracks.map((track) => track.id),
+    Array.from({ length: 250 }, (_, i) => `bili:BV${i + 1}:${i + 1}`),
+  );
+});
+
+test("filtered and multi-part videos advance by source page, not returned track count", async (t) => {
+  const { provider } = await harness(t, (url) => {
+    if (url.pathname.endsWith("/view"))
+      return json({
+        code: 0,
+        data: {
+          pages: [
+            { cid: 11, part: "A" },
+            { cid: 12, part: "B" },
+          ],
+        },
+      });
+    const pn = Number(url.searchParams.get("pn"));
+    if (pn === 1) return json(page([{ ...media(1), attr: 1 }], true));
+    const multi = media(2);
+    delete multi.ugc;
+    return json(page([multi, media(3)]));
+  });
+  const first = await provider.fetchPlaylistTracksPage("123");
+  assert.deepEqual(first.tracks, []);
+  assert.equal(first.hasMore, true);
+  const second = await provider.fetchPlaylistTracksPage(
+    "123",
+    first.nextOffset,
+  );
+  assert.deepEqual(
+    second.tracks.map((track) => track.id),
+    ["bili:BV2:11", "bili:BV2:12", "bili:BV3:3"],
+  );
+  assert.equal(second.nextOffset, 40);
+});
+
+test("shares and caches page loads, and refresh invalidates later pages only in that folder", async (t) => {
+  let generation = 1;
+  const { provider, calls } = await harness(t, async (url) => {
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    return json(
+      page(
+        [media(generation * 100 + Number(url.searchParams.get("pn")))],
+        true,
+      ),
+    );
+  });
+  await Promise.all([
+    provider.fetchPlaylistTracksPage("123", 0, 20, true),
+    provider.fetchPlaylistTracksPage("123", 0, 20, true),
+  ]);
+  await provider.fetchPlaylistTracksPage("123");
+  await provider.fetchPlaylistTracksPage("123", 20);
+  await provider.fetchPlaylistTracksPage("456", 20);
+  generation = 2;
+  await provider.fetchPlaylistTracksPage("123", 0, 20, true);
+  assert.equal(
+    (await provider.fetchPlaylistTracksPage("123", 20)).tracks[0].id,
+    "bili:BV202:202",
+  );
+  assert.equal(
+    (await provider.fetchPlaylistTracksPage("456", 20)).tracks[0].id,
+    "bili:BV102:102",
+  );
+  assert.equal(
+    calls.filter((url) => url.pathname.endsWith("/resource/list")).length,
+    5,
+  );
+});
+
+test("a rejected page is not cached or retried automatically and cannot erase a successful page", async (t) => {
+  let rejectPage = true;
+  const { provider, calls, warnings } = await harness(t, (url) => {
+    const pn = Number(url.searchParams.get("pn"));
+    if (pn === 2 && rejectPage)
+      return json({ code: -352, message: "请求被拒绝" });
+    return json(page([media(pn)], pn === 1));
+  });
+  const first = await provider.fetchPlaylistTracksPage("123");
+  await assert.rejects(
+    provider.fetchPlaylistTracksPage("123", first.nextOffset),
+    /-352/,
+  );
+  assert.deepEqual(await provider.fetchPlaylistTracksPage("123"), first);
+  assert.equal(
+    calls.filter((url) => url.pathname.endsWith("/resource/list")).length,
+    2,
+  );
+  assert.ok(
+    warnings.some(
+      (message) => message.includes("page 2") && message.includes("-352"),
+    ),
+  );
+  rejectPage = false;
+  assert.equal(
+    (await provider.fetchPlaylistTracksPage("123", first.nextOffset)).tracks[0]
+      .id,
+    "bili:BV2:2",
+  );
+});
+
+test("video-detail API rejections do not masquerade as an empty page", async (t) => {
+  const { provider } = await harness(t, (url) => {
+    if (url.pathname.endsWith("/view"))
+      return json({ code: -352, message: "请求被拒绝" });
+    const entry = media(1);
+    delete entry.ugc;
+    return json(page([entry]));
+  });
+  await assert.rejects(provider.fetchPlaylistTracksPage("123"), /-352/);
+});
+
+test("page caches stay isolated between sessions and clear at logout", async (t) => {
+  const { provider, values, calls } = await harness(t, () =>
+    json(page([media(1)])),
+  );
+  await provider.fetchPlaylistTracksPage("123");
+  values.set("auth", { cookie: "SESSDATA=another-session; DedeUserID=42" });
+  await provider.fetchPlaylistTracksPage("123");
+  assert.equal(
+    calls.filter((url) => url.pathname.endsWith("/resource/list")).length,
+    2,
+  );
+  await provider.logout();
+  await assert.rejects(provider.fetchPlaylistTracksPage("123"), /请先登录/);
+});
+
+test("a late page response from before refresh cannot repopulate the new folder cache", async (t) => {
+  let resolveOld;
+  let hold = true;
+  let secondPageCalls = 0;
+  const { provider } = await harness(t, (url) => {
+    if (url.searchParams.get("pn") === "2") {
+      secondPageCalls++;
+      if (hold)
+        return new Promise((resolve) => {
+          resolveOld = resolve;
+        });
+      return json(page([media(22)]));
+    }
+    return json(page([media(1)], true));
+  });
+  await provider.fetchPlaylistTracksPage("123");
+  const old = provider.fetchPlaylistTracksPage("123", 20);
+  while (!resolveOld) await new Promise((resolve) => setImmediate(resolve));
+  await provider.fetchPlaylistTracksPage("123", 0, 20, true);
+  hold = false;
+  resolveOld(json(page([media(2)])));
+  await old;
+  assert.equal(
+    (await provider.fetchPlaylistTracksPage("123", 20)).tracks[0].id,
+    "bili:BV22:22",
+  );
+  assert.equal(secondPageCalls, 2);
+});
+
 const cookie = "SESSDATA=test-session; DedeUserID=42; buvid3=test-device";
 const media = (id) => ({
   bvid: `BV${id}`,
@@ -162,7 +377,7 @@ test("does not retry authorization failures or hide them behind cached tracks", 
   await assert.rejects(provider.fetchPlaylistTracks("123"), /请先登录/);
 });
 
-test("concurrent library requests share folder and cover requests", async (t) => {
+test("concurrent library requests share the folder list without preloading folder contents", async (t) => {
   let folderCalls = 0;
   let coverCalls = 0;
   const { provider } = await harness(t, (url) => {
@@ -170,7 +385,13 @@ test("concurrent library requests share folder and cover requests", async (t) =>
       folderCalls++;
       return json({
         code: 0,
-        data: { list: [{ id: 123, title: "Favorites", media_count: 1 }] },
+        data: {
+          list: Array.from({ length: 120 }, (_, id) => ({
+            id,
+            title: "Favorites",
+            media_count: 3000,
+          })),
+        },
       });
     }
     coverCalls++;
@@ -178,7 +399,7 @@ test("concurrent library requests share folder and cover requests", async (t) =>
   });
   await Promise.all([provider.fetchUserLibrary(), provider.fetchUserLibrary()]);
   assert.equal(folderCalls, 1);
-  assert.equal(coverCalls, 1);
+  assert.equal(coverCalls, 0);
 });
 
 test("rejects missing playlist data instead of caching a false empty playlist", async (t) => {
@@ -191,7 +412,7 @@ test("rejects missing playlist data instead of caching a false empty playlist", 
   assert.equal(attempts, 2);
 });
 
-test("loads a 1000-video folder with bounded parallel pages in the original order", async (t) => {
+test("legacy full loads request pages sequentially in the original order", async (t) => {
   let inFlight = 0;
   let maxInFlight = 0;
   const { provider, calls } = await harness(t, async (url) => {
@@ -214,7 +435,7 @@ test("loads a 1000-video folder with bounded parallel pages in the original orde
     tracks.map((track) => track.id),
     Array.from({ length: 1000 }, (_, i) => `bili:BV${i + 1}:${i + 1}`),
   );
-  assert.equal(maxInFlight, 3);
+  assert.equal(maxInFlight, 1);
   assert.equal(
     calls.filter((url) => url.pathname.endsWith("/resource/list")).length,
     50,

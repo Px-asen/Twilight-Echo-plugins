@@ -33,12 +33,12 @@ const WBI_KEYS_CACHE_TTL_MS = 10 * 60 * 1000
 const DEVICE_COOKIE_TIMEOUT_MS = 3000
 const MAX_FAVORITE_PAGES = 50
 const PAGE_SIZE = 20
-const FAVORITE_PAGE_CONCURRENCY = 3
+const FAVORITE_PAGE_CONCURRENCY = 1
 // Leave time for IPC serialization before the host's 120s library RPC limit.
 const FAVORITE_LOAD_TIMEOUT_MS = 105000
 const PLAYBACK_LOAD_TIMEOUT_MS = 27000
-const VIDEO_VIEW_CONCURRENCY = 6
-const FAVORITE_COVER_CONCURRENCY = 4
+const VIDEO_VIEW_CONCURRENCY = 2
+const MAX_FAVORITE_PAGE_CACHE_ENTRIES = 300
 const FAVORITE_CACHE_TTL_MS = 10 * 60 * 1000
 const FAVORITE_CACHE_STALE_TTL_MS = 60 * 60 * 1000
 const SEARCH_DEFAULT_LIMIT = 30
@@ -59,6 +59,9 @@ let proxyPort = 0
 const proxyTokens = new Map()
 const favoriteTrackCache = new Map()
 const favoriteTrackRequests = new Map()
+const favoritePageCache = new Map()
+const favoritePageRequests = new Map()
+const favoriteFolderVersions = new Map()
 const favoriteLibraryRequests = new Map()
 const loginCheckRequests = new Map()
 let cookieRefreshCheckedAt = 0
@@ -93,6 +96,7 @@ export async function activate(context) {
     checkQrLogin,
     fetchUserLibrary,
     fetchPlaylistTracks,
+    fetchPlaylistTracksPage,
     searchSongs,
     getPlaybackUrl,
     // The renderer exposes every method matching this plugin's declared
@@ -150,6 +154,9 @@ export async function deactivate() {
   proxyTokens.clear()
   favoriteTrackCache.clear()
   favoriteTrackRequests.clear()
+  favoritePageCache.clear()
+  favoritePageRequests.clear()
+  favoriteFolderVersions.clear()
   favoriteLibraryRequests.clear()
   loginCheckRequests.clear()
   cookieRefreshCheckedAt = 0
@@ -237,6 +244,9 @@ async function logout() {
   proxyTokens.clear()
   favoriteTrackCache.clear()
   favoriteTrackRequests.clear()
+  favoritePageCache.clear()
+  favoritePageRequests.clear()
+  favoriteFolderVersions.clear()
   favoriteLibraryRequests.clear()
   loginCheckRequests.clear()
   cookieRefreshCheckedAt = 0
@@ -304,26 +314,20 @@ async function loadUserLibrary(deadline) {
     }
   })
   const list = Array.isArray(response.data?.list) ? response.data.list : []
-  const playlists = await mapWithConcurrency(
-    sortFavoriteFolders(list, pinnedFavoriteFolderIds),
-    FAVORITE_COVER_CONCURRENCY,
-    async (folder) => {
+  const playlists = await Promise.all(
+    sortFavoriteFolders(list, pinnedFavoriteFolderIds).map(async (folder) => {
       const id = String(folder.id)
-      // Prefer the cover of the first video inside the folder over the
-      // default folder cover returned by the folder-list API.
-      const firstVideoCover = await fetchFavoriteFirstCover(id, cookie, deadline)
       return {
         id,
         name: String(folder.title || 'Bilibili 收藏夹'),
         cover:
-          firstVideoCover ||
           (typeof folder.cover === 'string' && folder.cover
             ? await createImageProxyUrl(folder.cover, cookie)
             : null),
         trackCount: Number(folder.media_count) || 0,
         pinned: pinnedFavoriteFolderIds.includes(id)
       }
-    }
+    })
   )
   return {
     likedPlaylist: playlists[0] ?? null,
@@ -331,33 +335,91 @@ async function loadUserLibrary(deadline) {
   }
 }
 
-/**
- * Fetch the cover of the first video in a favorite folder.
- * Returns a proxied image URL or null when the folder is empty or the
- * request fails (caller falls back to the folder default cover).
- */
-async function fetchFavoriteFirstCover(folderId, cookie, deadline) {
-  try {
-    const url = new URL('https://api.bilibili.com/x/v3/fav/resource/list')
-    url.searchParams.set('media_id', String(folderId))
-    url.searchParams.set('ps', '1')
-    url.searchParams.set('pn', '1')
-    url.searchParams.set('type', '0')
-    url.searchParams.set('platform', 'web')
-    const response = await biliJson(url, { cookie, deadline })
-    const medias = Array.isArray(response.data?.medias) ? response.data.medias : []
-    const first = medias.find((media) => media?.type === 2 && media?.attr === 0) ?? medias[0]
-    const cover = typeof first?.cover === 'string' && first.cover
-      ? first.cover
-      : typeof first?.pic === 'string' && first.pic
-        ? first.pic
-        : null
-    if (!cover) return null
-    return createImageProxyUrl(cover, cookie)
-  } catch (error) {
-    logWarn(`Bilibili first-cover fetch failed for folder ${folderId}: ${errorToMessage(error)}`)
-    return null
+async function fetchPlaylistTracksPage(playlistId, offset = 0, limit = PAGE_SIZE, force = false) {
+  const size = Math.min(PAGE_SIZE, Math.max(1, Math.floor(Number(limit) || PAGE_SIZE)))
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset % size !== 0) {
+    throw new Error('Bilibili 收藏夹分页位置无效')
   }
+  const deadline = Date.now() + FAVORITE_LOAD_TIMEOUT_MS
+  const auth = await readAuth()
+  if (!auth?.cookie) throw new Error('请先登录 Bilibili')
+  const context = requireContext()
+  const session = favoriteSessionKey(auth.cookie)
+  const folderKey = JSON.stringify([session, String(playlistId)])
+  const cacheKey = JSON.stringify([folderKey, offset, size])
+  const version = favoriteFolderVersions.get(folderKey) || 0
+  const cached = favoritePageCache.get(cacheKey)
+  if (!force && cached && isCacheEntryFresh(cached, Date.now())) return cached.page
+  const requestKey = force && offset === 0
+    ? JSON.stringify([folderKey, 'refresh'])
+    : JSON.stringify([cacheKey, version])
+  return shareRequest(favoritePageRequests, requestKey, async () => {
+    let pageVersion = version
+    // Refresh once per shared request. Late responses from older loads must
+    // not repopulate the refreshed folder with stale later pages.
+    if (force && offset === 0) {
+      pageVersion++
+      favoriteFolderVersions.set(folderKey, pageVersion)
+      for (const [key, entry] of favoritePageCache) {
+        if (entry.folderKey === folderKey) favoritePageCache.delete(key)
+      }
+    }
+    try {
+      const { cookie } = await requireLoggedIn()
+      const data = await fetchFavoritePage(playlistId, cookie, offset / size + 1, size, deadline)
+      const medias = Array.isArray(data.medias) ? data.medias : []
+      const albumName = typeof data.info?.title === 'string' ? data.info.title : 'Bilibili'
+      const tracks = await mapWithConcurrency(
+        medias.filter((media) => media?.type === 2 && media?.attr === 0),
+        VIDEO_VIEW_CONCURRENCY,
+        (media) => mapMediaToTracks(media, albumName, cookie, deadline)
+      )
+      const page = {
+        tracks: tracks.flat().filter(Boolean),
+        // media_count counts videos, not expanded playable tracks.
+        total: null,
+        nextOffset: offset + size,
+        hasMore: Boolean(data.has_more) && medias.length > 0
+      }
+      if (
+        pluginContext === context && favoriteSessionKey((await readAuth())?.cookie) === session &&
+        (favoriteFolderVersions.get(folderKey) || 0) === pageVersion
+      ) {
+        favoritePageCache.delete(cacheKey)
+        favoritePageCache.set(cacheKey, { folderKey, page, expiresAt: Date.now() + FAVORITE_CACHE_TTL_MS })
+        while (favoritePageCache.size > MAX_FAVORITE_PAGE_CACHE_ENTRIES) {
+          favoritePageCache.delete(favoritePageCache.keys().next().value)
+        }
+      }
+      return page
+    } catch (error) {
+      logWarn(`Bilibili favorite folder ${playlistId} page ${offset / size + 1} failed: ${errorToMessage(error)} (code=${error?.biliCode ?? 'network'})`)
+      throw error
+    }
+  })
+}
+
+async function fetchFavoritePage(playlistId, cookie, page, size, deadline) {
+  const url = new URL('https://api.bilibili.com/x/v3/fav/resource/list')
+  url.searchParams.set('media_id', String(playlistId))
+  url.searchParams.set('ps', String(size))
+  url.searchParams.set('pn', String(page))
+  url.searchParams.set('type', '0')
+  url.searchParams.set('platform', 'web')
+  const response = await biliJson(url, {
+    cookie, retries: 1, deadline,
+    validate: (response) => {
+      const data = response.data
+      if (
+        !data || typeof data !== 'object' ||
+        (data.medias != null && !Array.isArray(data.medias)) ||
+        (data.medias == null && (data.has_more || Number(data.info?.media_count) > 0))
+      ) {
+        throw transientError('Bilibili 收藏夹数据不完整，请稍后重试')
+      }
+    }
+  })
+  return response.data
 }
 
 async function fetchPlaylistTracks(playlistId, force = false) {
@@ -392,27 +454,7 @@ async function fetchPlaylistTracks(playlistId, force = false) {
 }
 
 async function loadFavoriteTracks(playlistId, cookie, deadline) {
-  const fetchPage = async (page) => {
-    const url = new URL('https://api.bilibili.com/x/v3/fav/resource/list')
-    url.searchParams.set('media_id', String(playlistId))
-    url.searchParams.set('ps', String(PAGE_SIZE))
-    url.searchParams.set('pn', String(page))
-    url.searchParams.set('type', '0')
-    url.searchParams.set('platform', 'web')
-    return biliJson(url, {
-      cookie, retries: 1, deadline,
-      validate: (response) => {
-        const data = response.data
-        if (
-          !data || typeof data !== 'object' ||
-          (data.medias != null && !Array.isArray(data.medias)) ||
-          (data.medias == null && (data.has_more || Number(data.info?.media_count) > 0))
-        ) {
-          throw transientError('Bilibili 收藏夹数据不完整，请稍后重试')
-        }
-      }
-    }).then((response) => response.data)
-  }
+  const fetchPage = (page) => fetchFavoritePage(playlistId, cookie, page, PAGE_SIZE, deadline)
   const first = await fetchPage(1)
   const entries = []
   const appendPage = (data) => {
@@ -617,7 +659,7 @@ async function mapMediaToTracks(media, albumName, cookie, deadline) {
   if (!bvid) return []
   const directCid = extractMediaCid(media)
   const view = directCid ? null : await getVideoView(bvid, cookie, { deadline, retries: 1 }).catch((error) => {
-    if (error?.retryable) throw error
+    if (!isTrackMissingError(error)) throw error
     logWarn(`Skipping Bilibili media ${bvid}: ${errorToMessage(error)}`)
     return null
   })
