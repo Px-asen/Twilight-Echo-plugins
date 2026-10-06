@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { activate } from './index.mjs'
+import { activate, deactivate } from './index.mjs'
 import {
   encodeWbiWithKeys,
   extractCookieValue,
@@ -273,6 +273,110 @@ function stubFetch(handler) {
     globalThis.fetch = originalFetch
   }
 }
+
+async function createLoginHarness(t, profileResponse) {
+  await deactivate()
+  t.after(deactivate)
+  const settings = new Map([['auth', { cookie: 'SESSDATA=test-session; DedeUserID=42' }]])
+  const requests = []
+  const nav = { isLogin: true, mid: 42, uname: '测试用户', face: '//i0.hdslb.com/avatar.jpg' }
+  let provider
+  await activate({
+    logger: { info: () => undefined, warn: () => undefined },
+    settings: {
+      get: async (key) => settings.get(key),
+      set: async (key, value) => settings.set(key, value),
+      delete: async (key) => settings.delete(key)
+    },
+    twilight: {
+      providers: { register: async (value) => (provider = value) },
+      ui: { register: async () => undefined, onCommand: () => undefined }
+    }
+  })
+  t.mock.method(globalThis, 'fetch', async (input, options) => {
+    const url = new URL(input)
+    requests.push(url.pathname)
+    if (url.pathname === '/x/web-interface/nav') return Response.json({ code: 0, data: nav })
+    if (url.pathname === '/x/space/myinfo') {
+      assert.equal(options.headers.Cookie, settings.get('auth').cookie)
+      assert.equal(options.headers.Referer, 'https://www.bilibili.com/')
+      return profileResponse(options)
+    }
+    throw new Error(`Unexpected Bilibili request: ${url.pathname}`)
+  })
+  return { provider, settings, requests, nav }
+}
+
+test('returns the account signature in checkLogin and caches it for getProfile', async (t) => {
+  const { provider, settings, requests, nav } = await createLoginHarness(t, () =>
+    Response.json({ code: 0, data: { mid: nav.mid, sign: '音乐与生活\n继续前行' } })
+  )
+  const login = await provider.checkLogin()
+  assert.equal(login.loggedIn, true)
+  assert.equal(login.profile.userId, 42)
+  assert.equal(login.profile.nickname, '测试用户')
+  assert.match(login.profile.avatarUrl, /^http:\/\/127\.0\.0\.1:\d+\/image\//)
+  assert.equal(login.profile.signature, '音乐与生活\n继续前行')
+  assert.deepEqual(await provider.getProfile(), login.profile)
+  assert.deepEqual(requests, ['/x/web-interface/nav', '/x/space/myinfo'])
+
+  settings.set('auth', { cookie: 'SESSDATA=another-account; DedeUserID=43' })
+  nav.mid = 43
+  assert.equal((await provider.checkLogin()).profile.userId, 43)
+  assert.equal(requests.filter((path) => path === '/x/space/myinfo').length, 2)
+
+  await provider.logout()
+  assert.deepEqual(await provider.checkLogin(), { loggedIn: false, profile: null })
+})
+
+test('keeps login usable when profile details fail or contain no usable signature', async (t) => {
+  for (const [name, profileResponse] of [
+    ['empty signature', () => Response.json({ code: 0, data: { mid: 42, sign: '' } })],
+    ['missing signature', () => Response.json({ code: 0, data: { mid: 42 } })],
+    ['invalid signature', () => Response.json({ code: 0, data: { mid: 42, sign: 123 } })],
+    ['different account', () => Response.json({ code: 0, data: { mid: 99, sign: 'other user' } })],
+    ['API rejection', () => Response.json({ code: -403, message: '访问受限' })],
+    ['HTTP failure', () => new Response('', { status: 503 })],
+    ['network failure', () => { throw new Error('Network unavailable') }]
+  ]) {
+    await t.test(name, async (t) => {
+      const { provider, requests } = await createLoginHarness(t, profileResponse)
+      const login = await provider.checkLogin()
+      assert.equal(login.loggedIn, true)
+      assert.equal(login.profile.nickname, '测试用户')
+      assert.equal(login.profile.signature, '')
+      assert.deepEqual(await provider.getProfile(), login.profile)
+      assert.equal(requests.filter((path) => path === '/x/space/myinfo').length, 1)
+    })
+  }
+})
+
+test('bounds a stalled profile request without marking the account logged out', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let profileRequested
+  const requested = new Promise((resolve) => (profileRequested = resolve))
+  const { provider } = await createLoginHarness(t, ({ signal }) => {
+    profileRequested()
+    return new Promise((resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+  })
+  const pending = provider.checkLogin()
+  await requested
+  t.mock.timers.tick(3000)
+  const login = await pending
+  assert.equal(login.loggedIn, true)
+  assert.equal(login.profile.signature, '')
+})
+
+test('does not request profile details when the session is rejected', async (t) => {
+  const { provider, nav, requests } = await createLoginHarness(t, () => {
+    throw new Error('Rejected sessions must not fetch profile details')
+  })
+  nav.isLogin = false
+  assert.deepEqual(await provider.checkLogin(), { loggedIn: false, profile: null })
+  assert.deepEqual(requests, ['/x/web-interface/nav'])
+})
 
 test('registers safe stubs for every capability-exposed provider method', async () => {
   let registered = null

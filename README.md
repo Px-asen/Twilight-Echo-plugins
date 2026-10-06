@@ -189,7 +189,7 @@ pnpm run pack:qishui
 
 `pnpm run pack` creates or updates:
 
-- `packages/com.twilightecho.provider.bilibili-0.1.13.tep`
+- `packages/com.twilightecho.provider.bilibili-0.1.15.tep`
 - `plugins.json`
 
 `pnpm run pack:qqmusic` creates or updates
@@ -215,7 +215,7 @@ pnpm run dev
 ```
 
 The index uses relative package URLs such as
-`packages/com.twilightecho.provider.bilibili-0.1.13.tep`, so Twilight Echo
+`packages/com.twilightecho.provider.bilibili-0.1.15.tep`, so Twilight Echo
 resolves the package from the same GitHub raw base URL.
 
 ## Deploy to EdgeOne Makers

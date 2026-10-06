@@ -21,18 +21,26 @@ const IMAGE_PROXY_TOKEN_TTL_MS = 6 * 60 * 60 * 1000
 const BILI_REQUEST_TIMEOUT_MS = 10000
 const PLAYURL_TIMEOUT_MS = 8000
 const COOKIE_REFRESH_TIMEOUT_MS = 5000
+const PROFILE_REQUEST_TIMEOUT_MS = 3000
 // Time to receive upstream response headers before moving to the next CDN
 // candidate. Bilibili regularly routes playurl responses to P2P edge nodes
 // that accept the connection and then never answer.
 const STREAM_CANDIDATE_TIMEOUT_MS = 15000
 const LOGIN_CHECK_CACHE_TTL_MS = 60 * 1000
+const LOGIN_CHECK_TIMEOUT_MS = 12500
+const LOGIN_CHECK_STALE_TTL_MS = 5 * 60 * 1000
 const WBI_KEYS_CACHE_TTL_MS = 10 * 60 * 1000
 const DEVICE_COOKIE_TIMEOUT_MS = 3000
 const MAX_FAVORITE_PAGES = 50
 const PAGE_SIZE = 20
+const FAVORITE_PAGE_CONCURRENCY = 3
+// Leave time for IPC serialization before the host's 120s library RPC limit.
+const FAVORITE_LOAD_TIMEOUT_MS = 105000
+const PLAYBACK_LOAD_TIMEOUT_MS = 27000
 const VIDEO_VIEW_CONCURRENCY = 6
 const FAVORITE_COVER_CONCURRENCY = 4
 const FAVORITE_CACHE_TTL_MS = 10 * 60 * 1000
+const FAVORITE_CACHE_STALE_TTL_MS = 60 * 60 * 1000
 const SEARCH_DEFAULT_LIMIT = 30
 const SEARCH_PAGE_SIZE = 20
 const SEARCH_VIEW_CONCURRENCY = 6
@@ -50,6 +58,9 @@ let proxyServerStart = null
 let proxyPort = 0
 const proxyTokens = new Map()
 const favoriteTrackCache = new Map()
+const favoriteTrackRequests = new Map()
+const favoriteLibraryRequests = new Map()
+const loginCheckRequests = new Map()
 let cookieRefreshCheckedAt = 0
 // Login state and WBI keys are cached so the getPlaybackUrl hot path does not
 // spend two nav round-trips per track switch; a slow nav chain used to push
@@ -138,6 +149,9 @@ export async function activate(context) {
 export async function deactivate() {
   proxyTokens.clear()
   favoriteTrackCache.clear()
+  favoriteTrackRequests.clear()
+  favoriteLibraryRequests.clear()
+  loginCheckRequests.clear()
   cookieRefreshCheckedAt = 0
   loginStateCache = null
   wbiKeysCache = null
@@ -163,23 +177,51 @@ async function checkLogin() {
   ) {
     return { loggedIn: true, profile: loginStateCache.profile }
   }
+  return shareRequest(loginCheckRequests, auth.cookie, () => checkLoginWithAuth(auth))
+}
+
+async function checkLoginWithAuth(auth) {
+  const deadline = Date.now() + LOGIN_CHECK_TIMEOUT_MS
   try {
-    const nav = await biliJson('https://api.bilibili.com/x/web-interface/nav', { cookie: auth.cookie })
+    const nav = await biliJson('https://api.bilibili.com/x/web-interface/nav', {
+      cookie: auth.cookie, retries: 1, deadline,
+      validate: (response) => {
+        if (typeof response.data?.isLogin !== 'boolean') {
+          throw transientError('Bilibili 登录状态响应不完整，请稍后重试')
+        }
+      }
+    }, 4000)
     const data = nav.data
     if (!data?.isLogin) {
       loginStateCache = null
       logWarn('Bilibili session rejected by nav (isLogin=false); re-login required')
       return { loggedIn: false, profile: null }
     }
-    const refreshed = await refreshCookieIfNeeded(auth)
+    // Profile enrichment is optional and runs alongside cookie maintenance so
+    // their timeout budgets do not stack on the playback login-check chain.
+    const [refreshed, profileDetails] = await Promise.all([
+      refreshCookieIfNeeded(auth, deadline),
+      fetchProfileDetails(data.mid, auth.cookie, deadline)
+    ])
     const cookie = refreshed?.cookie || auth.cookie
     cacheWbiKeysFromNav(data)
-    const profile = await mapProfile(data, cookie)
+    const profile = await mapProfile(data, cookie, profileDetails)
     loginStateCache = { cookie, profile, expiresAt: Date.now() + LOGIN_CHECK_CACHE_TTL_MS }
     return { loggedIn: true, profile }
   } catch (error) {
     logWarn(`Bilibili login check failed: ${errorToMessage(error)}`)
-    return { loggedIn: false, profile: null }
+    if (error?.biliCode === -101) {
+      loginStateCache = null
+      return { loggedIn: false, profile: null }
+    }
+    if (
+      error?.retryable && loginStateCache?.cookie === auth.cookie &&
+      Date.now() < loginStateCache.expiresAt + LOGIN_CHECK_STALE_TTL_MS
+    ) {
+      return { loggedIn: true, profile: loginStateCache.profile }
+    }
+    // A failed network probe does not prove that the saved session expired.
+    throw error
   }
 }
 
@@ -194,13 +236,16 @@ async function logout() {
   await requireContext().settings.delete(SETTINGS_PINNED_FAVORITES_KEY)
   proxyTokens.clear()
   favoriteTrackCache.clear()
+  favoriteTrackRequests.clear()
+  favoriteLibraryRequests.clear()
+  loginCheckRequests.clear()
   cookieRefreshCheckedAt = 0
   loginStateCache = null
   wbiKeysCache = null
 }
 
 async function getQrLogin() {
-  const response = await biliJson('https://passport.bilibili.com/x/passport-login/web/qrcode/generate')
+  const response = await biliJson('https://passport.bilibili.com/x/passport-login/web/qrcode/generate', { retries: 1 }, 4000)
   const data = response.data
   if (!data?.qrcode_key || !data?.url) {
     throw new Error('Bilibili 二维码生成失败')
@@ -216,11 +261,11 @@ async function checkQrLogin(key) {
   if (typeof key !== 'string' || !key.trim()) throw new Error('Bilibili 二维码 key 无效')
   const url = new URL('https://passport.bilibili.com/x/passport-login/web/qrcode/poll')
   url.searchParams.set('qrcode_key', key.trim())
-  const response = await fetchWithTimeout(url, { headers: defaultHeaders() })
-  const json = await response.json()
+  const { headers, json } = await fetchWithTimeout(url, { headers: defaultHeaders() }, BILI_REQUEST_TIMEOUT_MS,
+    async (response) => ({ headers: response.headers, json: await response.json() }))
   const code = Number(json?.data?.code ?? json?.code)
   if (code === 0) {
-    const cookies = parseSetCookies(getSetCookieHeaders(response.headers))
+    const cookies = parseSetCookies(getSetCookieHeaders(headers))
     const cookie = mergeCookieString(cookies)
     if (!cookie.includes('SESSDATA=')) throw new Error('Bilibili 登录成功但没有返回 SESSDATA')
     const refreshToken = typeof json?.data?.refresh_token === 'string' ? json.data.refresh_token : ''
@@ -238,12 +283,26 @@ async function checkQrLogin(key) {
 }
 
 async function fetchUserLibrary() {
+  const deadline = Date.now() + FAVORITE_LOAD_TIMEOUT_MS
+  const auth = await readAuth()
+  if (!auth?.cookie) throw new Error('请先登录 Bilibili')
+  return shareRequest(favoriteLibraryRequests, auth.cookie, () => loadUserLibrary(deadline))
+}
+
+async function loadUserLibrary(deadline) {
   const { cookie, profile } = await requireLoggedIn()
   const pinnedFavoriteFolderIds = await readPinnedFavoriteFolderIds()
   const url = new URL('https://api.bilibili.com/x/v3/fav/folder/created/list-all')
   url.searchParams.set('up_mid', String(profile.userId))
   url.searchParams.set('type', '2')
-  const response = await biliJson(url, { cookie })
+  const response = await biliJson(url, {
+    cookie, retries: 1, deadline,
+    validate: (response) => {
+      if (!response.data || (response.data.list != null && !Array.isArray(response.data.list))) {
+        throw transientError('Bilibili 收藏夹列表数据不完整，请稍后重试')
+      }
+    }
+  })
   const list = Array.isArray(response.data?.list) ? response.data.list : []
   const playlists = await mapWithConcurrency(
     sortFavoriteFolders(list, pinnedFavoriteFolderIds),
@@ -252,7 +311,7 @@ async function fetchUserLibrary() {
       const id = String(folder.id)
       // Prefer the cover of the first video inside the folder over the
       // default folder cover returned by the folder-list API.
-      const firstVideoCover = await fetchFavoriteFirstCover(id, cookie)
+      const firstVideoCover = await fetchFavoriteFirstCover(id, cookie, deadline)
       return {
         id,
         name: String(folder.title || 'Bilibili 收藏夹'),
@@ -277,7 +336,7 @@ async function fetchUserLibrary() {
  * Returns a proxied image URL or null when the folder is empty or the
  * request fails (caller falls back to the folder default cover).
  */
-async function fetchFavoriteFirstCover(folderId, cookie) {
+async function fetchFavoriteFirstCover(folderId, cookie, deadline) {
   try {
     const url = new URL('https://api.bilibili.com/x/v3/fav/resource/list')
     url.searchParams.set('media_id', String(folderId))
@@ -285,7 +344,7 @@ async function fetchFavoriteFirstCover(folderId, cookie) {
     url.searchParams.set('pn', '1')
     url.searchParams.set('type', '0')
     url.searchParams.set('platform', 'web')
-    const response = await biliJson(url, { cookie })
+    const response = await biliJson(url, { cookie, deadline })
     const medias = Array.isArray(response.data?.medias) ? response.data.medias : []
     const first = medias.find((media) => media?.type === 2 && media?.attr === 0) ?? medias[0]
     const cover = typeof first?.cover === 'string' && first.cover
@@ -302,31 +361,103 @@ async function fetchFavoriteFirstCover(folderId, cookie) {
 }
 
 async function fetchPlaylistTracks(playlistId, force = false) {
-  const cacheKey = String(playlistId)
+  const deadline = Date.now() + FAVORITE_LOAD_TIMEOUT_MS
+  const auth = await readAuth()
+  if (!auth?.cookie) throw new Error('请先登录 Bilibili')
+  const context = requireContext()
+  const session = favoriteSessionKey(auth.cookie)
+  const cacheKey = JSON.stringify([session, String(playlistId)])
   const cached = favoriteTrackCache.get(cacheKey)
   if (!force && cached && isCacheEntryFresh(cached, Date.now())) return cached.tracks
+  return shareRequest(favoriteTrackRequests, cacheKey, async () => {
+    try {
+      const { cookie } = await requireLoggedIn()
+      const tracks = await loadFavoriteTracks(playlistId, cookie, deadline)
+      if (pluginContext === context && favoriteSessionKey((await readAuth())?.cookie) === session) {
+        favoriteTrackCache.set(cacheKey, { tracks, expiresAt: Date.now() + FAVORITE_CACHE_TTL_MS })
+      }
+      return tracks
+    } catch (error) {
+      if (
+        error?.retryable && cached && pluginContext === context &&
+        Date.now() < cached.expiresAt + FAVORITE_CACHE_STALE_TTL_MS &&
+        favoriteSessionKey((await readAuth())?.cookie) === session
+      ) {
+        logWarn(`Bilibili favorite folder ${playlistId} refresh failed; using cached tracks: ${errorToMessage(error)}`)
+        return cached.tracks
+      }
+      throw error
+    }
+  })
+}
 
-  const { cookie } = await requireLoggedIn()
-  const tracks = []
-  for (let page = 1; page <= MAX_FAVORITE_PAGES; page += 1) {
+async function loadFavoriteTracks(playlistId, cookie, deadline) {
+  const fetchPage = async (page) => {
     const url = new URL('https://api.bilibili.com/x/v3/fav/resource/list')
     url.searchParams.set('media_id', String(playlistId))
     url.searchParams.set('ps', String(PAGE_SIZE))
     url.searchParams.set('pn', String(page))
     url.searchParams.set('type', '0')
     url.searchParams.set('platform', 'web')
-    const response = await biliJson(url, { cookie })
-    const medias = Array.isArray(response.data?.medias) ? response.data.medias : []
-    const albumName = typeof response.data?.info?.title === 'string' ? response.data.info.title : 'Bilibili'
-    const playableMedias = medias.filter((media) => media?.type === 2 && media?.attr === 0)
-    const mappedTracks = await mapWithConcurrency(playableMedias, VIDEO_VIEW_CONCURRENCY, (media) =>
-      mapMediaToTracks(media, albumName, cookie)
-    )
-    tracks.push(...mappedTracks.flat().filter(Boolean))
-    if (!response.data?.has_more || medias.length === 0) break
+    return biliJson(url, {
+      cookie, retries: 1, deadline,
+      validate: (response) => {
+        const data = response.data
+        if (
+          !data || typeof data !== 'object' ||
+          (data.medias != null && !Array.isArray(data.medias)) ||
+          (data.medias == null && (data.has_more || Number(data.info?.media_count) > 0))
+        ) {
+          throw transientError('Bilibili 收藏夹数据不完整，请稍后重试')
+        }
+      }
+    }).then((response) => response.data)
   }
-  favoriteTrackCache.set(cacheKey, { tracks, expiresAt: Date.now() + FAVORITE_CACHE_TTL_MS })
-  return tracks
+  const first = await fetchPage(1)
+  const entries = []
+  const appendPage = (data) => {
+    const medias = Array.isArray(data.medias) ? data.medias : []
+    const albumName = typeof data.info?.title === 'string' ? data.info.title : 'Bilibili'
+    entries.push(...medias.filter((media) => media?.type === 2 && media?.attr === 0)
+      .map((media) => ({ media, albumName })))
+    return Boolean(data.has_more) && medias.length > 0
+  }
+  let hasMore = appendPage(first)
+  const knownPageCount = Math.min(MAX_FAVORITE_PAGES, Math.ceil(Number(first.info?.media_count) / PAGE_SIZE) || 1)
+  let nextPage = 2
+  while (hasMore && nextPage <= MAX_FAVORITE_PAGES) {
+    // Use the server's count when available; older payloads retain sequential
+    // has_more pagination instead of issuing requests beyond the final page.
+    const count = Math.min(FAVORITE_PAGE_CONCURRENCY, Math.max(1, knownPageCount - nextPage + 1))
+    const pages = await mapWithConcurrency(
+      Array.from({ length: count }, (_, index) => nextPage + index),
+      FAVORITE_PAGE_CONCURRENCY, fetchPage
+    )
+    for (const data of pages) {
+      hasMore = appendPage(data)
+      if (!hasMore) break
+    }
+    nextPage += count
+  }
+  const tracks = await mapWithConcurrency(entries, VIDEO_VIEW_CONCURRENCY, ({ media, albumName }) =>
+    mapMediaToTracks(media, albumName, cookie, deadline)
+  )
+  return tracks.flat().filter(Boolean)
+}
+
+function favoriteSessionKey(cookie) {
+  return cookie ? JSON.stringify([extractCookieValue(cookie, 'DedeUserID'), extractCookieValue(cookie, 'SESSDATA')]) : null
+}
+
+async function shareRequest(requests, key, load) {
+  if (requests.has(key)) return requests.get(key)
+  const pending = load()
+  requests.set(key, pending)
+  try {
+    return await pending
+  } finally {
+    if (requests.get(key) === pending) requests.delete(key)
+  }
 }
 
 async function searchSongs(keywords, limit = SEARCH_DEFAULT_LIMIT, offset = 0) {
@@ -361,10 +492,11 @@ async function searchSongs(keywords, limit = SEARCH_DEFAULT_LIMIT, offset = 0) {
 
 async function getPlaybackUrl(track) {
   const startedAt = Date.now()
+  const deadline = startedAt + PLAYBACK_LOAD_TIMEOUT_MS
   const { cookie } = await requireLoggedIn()
   const ids = parseBiliTrackId(track?.id || track?.filePath)
   if (!ids) throw new Error('Bilibili track id 无效')
-  const keys = await getWbiKeys(cookie)
+  const keys = await getWbiKeys(cookie, deadline)
   logInfo(`Bilibili getPlaybackUrl: ${ids.bvid}:${ids.cid}`)
 
   // Prefer DASH: a dedicated audio stream with backup CDN URLs. The
@@ -372,19 +504,20 @@ async function getPlaybackUrl(track) {
   // and is regularly routed to unstable P2P edge nodes that stall the proxy.
   let refreshedCid = null
   try {
-    const audioSource = await fetchDashAudioSource(ids, cookie, keys)
+    const audioSource = await fetchDashAudioSource(ids, cookie, keys, deadline)
     if (audioSource) return await createStreamUrl(audioSource, ids, cookie, startedAt)
   } catch (error) {
     logWarn(`Bilibili DASH unavailable for ${ids.bvid}:${ids.cid}: ${errorToMessage(error)}`)
     // A stale cid from a cached library listing yields playurl -404; re-resolve
     // the cid from the live view API once before giving up.
-    refreshedCid = await refreshCidFromView(ids, cookie)
+    refreshedCid = await refreshCidFromView(ids, cookie, deadline)
     if (refreshedCid) {
       try {
         const audioSource = await fetchDashAudioSource(
           { bvid: ids.bvid, cid: refreshedCid },
           cookie,
-          keys
+          keys,
+          deadline
         )
         if (audioSource) {
           return await createStreamUrl(audioSource, { bvid: ids.bvid, cid: refreshedCid }, cookie, startedAt)
@@ -414,7 +547,7 @@ async function getPlaybackUrl(track) {
     keys
   )
   const progressiveUrl = `https://api.bilibili.com/x/player/wbi/playurl?${progressiveQuery}`
-  const progressiveResponse = await biliJson(progressiveUrl, { cookie }, PLAYURL_TIMEOUT_MS)
+  const progressiveResponse = await biliJson(progressiveUrl, { cookie, deadline }, PLAYURL_TIMEOUT_MS)
   const progressiveMediaUrl = selectProgressivePlaybackUrl(progressiveResponse.data)
   if (!progressiveMediaUrl) throw new Error(`Bilibili 未返回可播放音频流：${ids.bvid}`)
   await ensureProxyServer()
@@ -428,7 +561,7 @@ async function getPlaybackUrl(track) {
   return `http://127.0.0.1:${proxyPort}/stream/${token}`
 }
 
-async function fetchDashAudioSource(ids, cookie, keys) {
+async function fetchDashAudioSource(ids, cookie, keys, deadline) {
   const dashQuery = encodeWbiWithKeys(
     {
       bvid: ids.bvid,
@@ -440,7 +573,7 @@ async function fetchDashAudioSource(ids, cookie, keys) {
     keys
   )
   const playUrl = `https://api.bilibili.com/x/player/wbi/playurl?${dashQuery}`
-  const response = await biliJson(playUrl, { cookie }, PLAYURL_TIMEOUT_MS)
+  const response = await biliJson(playUrl, { cookie, deadline }, PLAYURL_TIMEOUT_MS)
   return selectDashAudioSource(response.data)
 }
 
@@ -461,9 +594,9 @@ async function createStreamUrl(audioSource, ids, cookie, startedAt) {
   return `http://127.0.0.1:${proxyPort}/stream/${token}`
 }
 
-async function refreshCidFromView(ids, cookie) {
+async function refreshCidFromView(ids, cookie, deadline) {
   try {
-    const view = await getVideoView(ids.bvid, cookie)
+    const view = await getVideoView(ids.bvid, cookie, { deadline }, 3000)
     const pages = Array.isArray(view?.pages) ? view.pages : []
     const cid = Number(pages[0]?.cid ?? view?.cid)
     if (Number.isFinite(cid) && cid > 0 && cid !== Number(ids.cid)) return cid
@@ -479,11 +612,12 @@ export function isTrackMissingError(error) {
   return /啥都木有|-404|62002|62004|62012/.test(message)
 }
 
-async function mapMediaToTracks(media, albumName, cookie) {
+async function mapMediaToTracks(media, albumName, cookie, deadline) {
   const bvid = typeof media.bvid === 'string' ? media.bvid : typeof media.bv_id === 'string' ? media.bv_id : ''
   if (!bvid) return []
   const directCid = extractMediaCid(media)
-  const view = directCid ? null : await getVideoView(bvid, cookie).catch((error) => {
+  const view = directCid ? null : await getVideoView(bvid, cookie, { deadline, retries: 1 }).catch((error) => {
+    if (error?.retryable) throw error
     logWarn(`Skipping Bilibili media ${bvid}: ${errorToMessage(error)}`)
     return null
   })
@@ -566,16 +700,16 @@ async function mapSearchResultToTrack(item, cookie) {
   return track
 }
 
-async function getVideoView(bvid, cookie) {
+async function getVideoView(bvid, cookie, options = {}, timeoutMs = BILI_REQUEST_TIMEOUT_MS) {
   const url = new URL('https://api.bilibili.com/x/web-interface/view')
   url.searchParams.set('bvid', bvid)
-  const response = await biliJson(url, { cookie })
+  const response = await biliJson(url, { cookie, ...options }, timeoutMs)
   return response.data
 }
 
-async function getWbiKeys(cookie) {
+async function getWbiKeys(cookie, deadline) {
   if (wbiKeysCache && Date.now() < wbiKeysCache.expiresAt) return wbiKeysCache.keys
-  const nav = await biliJson('https://api.bilibili.com/x/web-interface/nav', { cookie })
+  const nav = await biliJson('https://api.bilibili.com/x/web-interface/nav', { cookie, deadline })
   cacheWbiKeysFromNav(nav.data)
   if (!wbiKeysCache) throw new Error('Bilibili WBI key 不可用')
   return wbiKeysCache.keys
@@ -595,33 +729,64 @@ export function extractMediaCid(media) {
   return Number.isFinite(cid) && cid > 0 ? cid : null
 }
 
-async function biliJson(input, options = {}, timeoutMs = BILI_REQUEST_TIMEOUT_MS) {
-  const response = await fetchWithTimeout(
-    input,
-    { headers: defaultHeaders(options.cookie) },
-    timeoutMs
-  )
-  if (!response.ok) {
-    throw new Error(`Bilibili 请求失败：HTTP ${response.status}`)
+export async function biliJson(input, options = {}, timeoutMs = BILI_REQUEST_TIMEOUT_MS) {
+  for (let attempt = 0; ; attempt++) {
+    const remaining = options.deadline == null ? timeoutMs : Math.min(timeoutMs, options.deadline - Date.now())
+    if (remaining <= 0) throw transientError('Bilibili 加载超时，请稍后重试')
+    try {
+      return await fetchWithTimeout(input, { headers: defaultHeaders(options.cookie) }, remaining, async (response) => {
+        if (!response.ok) {
+          const error = new Error(`Bilibili 请求失败：HTTP ${response.status}`)
+          error.retryable = [408, 429].includes(response.status) || response.status >= 500
+          const retryAfter = response.headers.get('retry-after')
+          if (retryAfter) {
+            const delay = /^\d+(?:\.\d+)?$/.test(retryAfter)
+              ? Number(retryAfter) * 1000 : Date.parse(retryAfter) - Date.now()
+            if (Number.isFinite(delay)) error.retryAfterMs = Math.max(0, delay)
+          }
+          await response.body?.cancel()
+          throw error
+        }
+        const json = await response.json()
+        if (typeof json?.code !== 'number') throw transientError('Bilibili 返回数据不完整，请稍后重试')
+        if (json?.code !== 0) {
+          const error = new Error(`Bilibili API 错误：${json?.message || '请求被拒绝'}（${json.code}）`)
+          error.biliCode = json?.code
+          throw error
+        }
+        options.validate?.(json)
+        return json
+      })
+    } catch (error) {
+      if (error instanceof TypeError || error instanceof SyntaxError) error.retryable = true
+      if (!error?.retryable || attempt >= (options.retries || 0)) throw error
+      const delay = Math.max(300, error.retryAfterMs || 0)
+      // Long rate-limit waits belong to a later user retry, not this RPC.
+      if (delay > 5000 || (options.deadline != null && options.deadline - Date.now() <= delay)) throw error
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
   }
-  const json = await response.json()
-  if (json?.code !== 0) {
-    throw new Error(`Bilibili API 错误：${json?.message || json?.code}`)
-  }
-  return json
 }
 
-async function fetchWithTimeout(input, options = {}, timeoutMs = BILI_REQUEST_TIMEOUT_MS) {
+function transientError(message) {
+  const error = new Error(message)
+  error.retryable = true
+  return error
+}
+
+async function fetchWithTimeout(input, options = {}, timeoutMs = BILI_REQUEST_TIMEOUT_MS, consume = (response) => response) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    return await fetch(input, {
+    const response = await fetch(input, {
       ...options,
       signal: controller.signal
     })
+    // JSON body reads must remain inside the timeout, not just response headers.
+    return await consume(response)
   } catch (error) {
     if (error?.name === 'AbortError') {
-      throw new Error('Bilibili 请求超时，请稍后重试')
+      throw transientError('Bilibili 请求超时，请稍后重试')
     }
     throw error
   } finally {
@@ -629,7 +794,7 @@ async function fetchWithTimeout(input, options = {}, timeoutMs = BILI_REQUEST_TI
   }
 }
 
-async function refreshCookieIfNeeded(auth) {
+async function refreshCookieIfNeeded(auth, deadline) {
   if (Date.now() - cookieRefreshCheckedAt < COOKIE_REFRESH_CHECK_INTERVAL_MS) return null
   cookieRefreshCheckedAt = Date.now()
   const biliJct = extractCookieValue(auth.cookie, 'bili_jct')
@@ -637,7 +802,7 @@ async function refreshCookieIfNeeded(auth) {
   try {
     const infoUrl = new URL('https://passport.bilibili.com/x/passport-login/web/cookie/info')
     infoUrl.searchParams.set('csrf', biliJct)
-    const info = await biliJson(infoUrl, { cookie: auth.cookie }, COOKIE_REFRESH_TIMEOUT_MS)
+    const info = await biliJson(infoUrl, { cookie: auth.cookie, deadline }, COOKIE_REFRESH_TIMEOUT_MS)
     if (!info?.data?.refresh) return null
     const refreshCsrf = typeof info.data.refresh_csrf === 'string' ? info.data.refresh_csrf : ''
     if (!refreshCsrf) {
@@ -648,12 +813,15 @@ async function refreshCookieIfNeeded(auth) {
     refreshUrl.searchParams.set('csrf', biliJct)
     refreshUrl.searchParams.set('refresh_csrf', refreshCsrf)
     refreshUrl.searchParams.set('source', 'main_web')
+    const remaining = Math.min(COOKIE_REFRESH_TIMEOUT_MS, deadline - Date.now())
+    if (remaining <= 0) return null
     const refreshResponse = await fetchWithTimeout(
       refreshUrl,
       { headers: defaultHeaders(auth.cookie) },
-      COOKIE_REFRESH_TIMEOUT_MS
+      remaining,
+      async (response) => ({ headers: response.headers, json: await response.json() })
     )
-    const refreshJson = await refreshResponse.json()
+    const refreshJson = refreshResponse.json
     if (refreshJson?.code !== 0) {
       logWarn(`Bilibili cookie refresh rejected: ${refreshJson?.message || refreshJson?.code}`)
       return null
@@ -697,15 +865,23 @@ async function setPinnedFavoriteFolder(playlist) {
 async function mapWithConcurrency(items, concurrency, mapper) {
   const results = new Array(items.length)
   let nextIndex = 0
+  let failed = false
+  let failure
   const workerCount = Math.min(Math.max(1, concurrency), items.length)
   const workers = Array.from({ length: workerCount }, async () => {
-    while (nextIndex < items.length) {
+    while (!failed && nextIndex < items.length) {
       const index = nextIndex
       nextIndex += 1
-      results[index] = await mapper(items[index], index)
+      try {
+        results[index] = await mapper(items[index], index)
+      } catch (error) {
+        if (!failed) failure = error
+        failed = true
+      }
     }
   })
   await Promise.all(workers)
+  if (failed) throw failure
   return results
 }
 
@@ -1103,12 +1279,27 @@ export function mapBiliMediaToTrack(media, options) {
   }
 }
 
-async function mapProfile(data, cookie) {
+async function fetchProfileDetails(userId, cookie, deadline) {
+  try {
+    const response = await biliJson(
+      'https://api.bilibili.com/x/space/myinfo',
+      { cookie, deadline },
+      PROFILE_REQUEST_TIMEOUT_MS
+    )
+    if (String(response.data?.mid) !== String(userId)) return null
+    return response.data
+  } catch (error) {
+    logWarn(`Bilibili profile details unavailable: ${errorToMessage(error)}`)
+    return null
+  }
+}
+
+async function mapProfile(data, cookie, profileDetails) {
   return {
     userId: data.mid,
     nickname: String(data.uname || 'Bilibili 用户'),
     avatarUrl: (await createImageProxyUrl(String(data.face || ''), cookie)) || '',
-    signature: '',
+    signature: typeof profileDetails?.sign === 'string' ? profileDetails.sign : '',
     follows: 0,
     followeds: 0
   }
