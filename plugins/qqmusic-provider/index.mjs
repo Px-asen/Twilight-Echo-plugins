@@ -46,6 +46,8 @@ ZjMSoSf6+KJGvar2ORhBfpDXyVtZCKpqLQ+FLkpncClKVIrBwv6PHyUvuCb0rIarmgDnzkfQAqVufEtR
 -----END PUBLIC KEY-----`
 
 const QUALITY_DEFINITIONS = {
+  // RS01 is the Hi-Res ladder (measured 96 kHz / 24-bit on tracks that carry it).
+  hires: { prefix: 'RS01', suffix: '.flac' },
   flac: { prefix: 'F000', suffix: '.flac' },
   320: { prefix: 'M800', suffix: '.mp3' },
   128: { prefix: 'M500', suffix: '.mp3' }
@@ -65,6 +67,39 @@ const playlistCategoryIds = new Map([['全部', 10000000]])
 
 const CONSENT_ERROR =
   '首次使用 QQ 音乐音源前，请在设置中阅读并确认免责声明。打开“设置 → 插件设置 → QQ 音乐音源”完成确认。'
+
+// The host only exposes a per-provider quality picker for NetEase Cloud Music
+// (ncmPlaybackQuality); third-party providers just receive options.quality,
+// which defaults to "auto". A quality ladder of ["128"] for "auto" would pin
+// playback to the lowest bitrate, so this plugin keeps its own preference and
+// defaults to the lossless-first ladder.
+const QUALITY_KEY = 'playbackQuality'
+const DEFAULT_QUALITY = 'auto'
+const QUALITY_CHOICES = [
+  { label: '自动（优先 Hi-Res，逐级降级）', value: 'auto' },
+  { label: 'Hi-Res 无损（最高 192kHz，若可用）', value: 'hires' },
+  { label: '无损 FLAC（SQ）', value: 'flac' },
+  { label: '320 kbps', value: '320' },
+  { label: '128 kbps', value: '128' }
+]
+
+function normalizeQualityChoice(value) {
+  const normalized = String(value || '').toLowerCase()
+  return QUALITY_CHOICES.some((choice) => choice.value === normalized) ? normalized : DEFAULT_QUALITY
+}
+
+function qualityLabel(value) {
+  const choice = QUALITY_CHOICES.find((item) => item.value === value)
+  return choice ? choice.label : String(value || DEFAULT_QUALITY)
+}
+
+async function readOwnQuality() {
+  try {
+    return normalizeQualityChoice(await requireContext().settings.get(QUALITY_KEY))
+  } catch {
+    return DEFAULT_QUALITY
+  }
+}
 
 export async function activate(context) {
   pluginContext = context
@@ -173,12 +208,15 @@ async function saveSettings(values) {
   if (!accepted) {
     throw new Error('请先选择“我已阅读并同意免责声明”')
   }
-  await requireContext().settings.set(CONSENT_KEY, {
+  const context = requireContext()
+  await context.settings.set(CONSENT_KEY, {
     disclaimerVersion: CONSENT_VERSION,
     acceptedAt: new Date().toISOString()
   })
+  const quality = normalizeQualityChoice(values && values[QUALITY_KEY])
+  await context.settings.set(QUALITY_KEY, quality)
   return {
-    message: '免责声明确认已保存。现在可以返回 QQ 音乐登录页扫码登录。',
+    message: `设置已保存。当前播放音质：${qualityLabel(quality)}。`,
     form: await createSettingsForm()
   }
 }
@@ -206,6 +244,15 @@ async function createSettingsForm() {
           { label: '请选择', value: '' },
           { label: '我已阅读并同意免责声明', value: CONSENT_VERSION }
         ]
+      },
+      {
+        key: QUALITY_KEY,
+        label: '播放音质',
+        type: 'select',
+        required: false,
+        placeholder: '',
+        value: await readOwnQuality(),
+        options: QUALITY_CHOICES
       }
     ]
   }
@@ -1555,6 +1602,52 @@ function publicMusicuData(payload, key) {
   return response.data && typeof response.data === 'object' ? response.data : {}
 }
 
+const FAVORITE_PLAYLIST_PAGE_SIZE = 100
+const FAVORITE_PLAYLIST_LIMIT = 1000
+
+function favoritePlaylistId(item) {
+  return String(item?.tid ?? item?.dissid ?? item?.id ?? item?.dirId ?? item?.dirid ?? '').trim()
+}
+
+// Collected playlists live behind a different module (PlaylistFavRead /
+// CgiGetPlaylistFavInfo), require the encrypted uin, and come back under `v_list`
+// instead of `v_playlist`. A failure here must not hide the created playlists, but
+// an expired session still has to propagate so the host can ask for a new login.
+async function fetchFavoritePlaylists(auth, requestContext) {
+  const encryptedUin = String(auth?.credential?.encryptUin || '').trim()
+  if (!encryptedUin) return []
+  const collected = []
+  const seen = new Set()
+  let offset = 0
+  try {
+    while (offset < FAVORITE_PLAYLIST_LIMIT) {
+      const page = await callNativeMusicu(
+        'music.musicasset.PlaylistFavRead',
+        'CgiGetPlaylistFavInfo',
+        { uin: encryptedUin, offset, size: FAVORITE_PLAYLIST_PAGE_SIZE },
+        { device: auth.device, credential: auth.credential, requestContext }
+      )
+      const items = Array.isArray(page?.v_list) ? page.v_list : []
+      let fresh = 0
+      for (const item of items) {
+        const id = favoritePlaylistId(item)
+        if (id && seen.has(id)) continue
+        if (id) seen.add(id)
+        collected.push(item)
+        fresh += 1
+      }
+      const hasMore = page?.hasmore === true || Number(page?.hasmore) === 1
+      if (!items.length || fresh === 0 || !hasMore) break
+      offset += items.length
+    }
+  } catch (error) {
+    if (error?.name === 'QQMusicAuthExpiredError' || error?.name === 'AbortError') throw error
+    logWarn(`QQ favorite playlists unavailable: ${safeErrorMessage(error)}`)
+    return []
+  }
+  return collected
+}
+
 async function fetchUserLibrary(force = false, requestContext) {
   await assertConsent()
   const auth = await requireAuth()
@@ -1574,7 +1667,10 @@ async function fetchUserLibrary(force = false, requestContext) {
   ])
   const profile = mapNativeProfile(profileData, auth.uin)
   const rawPlaylists = extractNativePlaylistItems(libraryData)
-  const mapped = rawPlaylists.map((item) => mapPlaylist(item, profile.nickname)).filter(Boolean)
+  const favoritePlaylists = await fetchFavoritePlaylists(auth, requestContext)
+  const mapped = [...rawPlaylists, ...favoritePlaylists]
+    .map((item) => mapPlaylist(item, profile.nickname, auth.uin))
+    .filter(Boolean)
   const favoriteMetadata = mapped.find((playlist) => isLikedPlaylist(playlist))
   const likedPlaylist = {
     id: 'liked',
@@ -1593,6 +1689,48 @@ async function fetchUserLibrary(force = false, requestContext) {
     for (const playlist of playlists) playlistCache.delete(String(playlist.id))
   }
   return { likedPlaylist, playlists }
+}
+
+const PLAYLIST_PAGE_SIZE = 100
+const PLAYLIST_PAGE_MAX = 10000
+const PLAYLIST_PAGE_DELAY_MS = 150
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// A single CgiGetDiss page returns at most 100 tracks, so longer playlists have
+// to be walked page by page instead of stopping after the first 100.
+async function collectPlaylistPages(fetchPage, label) {
+  const all = []
+  const seen = new Set()
+  let begin = 0
+  while (begin < PLAYLIST_PAGE_MAX) {
+    const page = await fetchPage(begin, PLAYLIST_PAGE_SIZE)
+    const tracks = Array.isArray(page?.tracks) ? page.tracks : []
+    let added = 0
+    for (const track of tracks) {
+      const key = String(track?.id ?? '')
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      all.push(track)
+      added += 1
+    }
+    const total = Number(page?.total)
+    if (tracks.length) {
+      pluginContext?.logger?.info?.(
+        `Playlist ${label}: page at ${begin} returned ${tracks.length} tracks (${all.length} collected${
+          Number.isFinite(total) && total > 0 ? ` of ${total}` : ''
+        })`
+      )
+    }
+    if (!tracks.length || added === 0) break
+    if (tracks.length < PLAYLIST_PAGE_SIZE) break
+    if (Number.isFinite(total) && total > 0 && all.length >= total) break
+    begin += PLAYLIST_PAGE_SIZE
+    await sleep(PLAYLIST_PAGE_DELAY_MS)
+  }
+  return all
 }
 
 async function fetchPlaylistTracks(playlistId, force = false, requestContext) {
@@ -1625,32 +1763,38 @@ async function fetchPlaylistTracks(playlistId, force = false, requestContext) {
     return tracks
   }
   if (!auth) await requireAuth()
-  const param =
+  const baseParam =
     id === 'liked'
       ? {
           disstid: 0,
           dirid: 201,
           tag: true,
-          song_begin: 0,
-          song_num: 100,
           userinfo: true,
           orderlist: true,
           enc_host_uin: auth.credential.encryptUin || ''
         }
       : {
           disstid: Number(id),
-          song_begin: 0,
-          song_num: 100,
           tag: true,
           userinfo: true
         }
-  const payload = await callNativeMusicu('music.srfDissInfo.DissInfo', 'CgiGetDiss', param, {
-    device: auth.device,
-    credential: auth.credential,
-    requestContext
-  })
-  const list = extractNativePlaylistTracks(payload)
-  const tracks = list.map(mapTrack).filter(Boolean)
+  const tracks = await collectPlaylistPages(async (songBegin, songNum) => {
+    const payload = await callNativeMusicu(
+      'music.srfDissInfo.DissInfo',
+      'CgiGetDiss',
+      { ...baseParam, song_begin: songBegin, song_num: songNum },
+      { device: auth.device, credential: auth.credential, requestContext }
+    )
+    return {
+      tracks: extractNativePlaylistTracks(payload).map(mapTrack).filter(Boolean),
+      total: normalizeCount(
+        payload?.total_song_num ??
+          payload?.dirinfo?.songnum ??
+          payload?.dirInfo?.songNum ??
+          payload?.total
+      )
+    }
+  }, id)
   playlistCache.set(id, { tracks, expiresAt: Date.now() + PLAYLIST_CACHE_TTL_MS })
   return tracks
 }
@@ -1769,7 +1913,13 @@ async function getPlaybackUrl(track, options = {}, requestContext) {
   const songmid = trackSongmid(track)
   if (!songmid) return null
   const mediaMid = trackMediaMid(track) || songmid
-  const qualities = qualityLadder(options?.quality)
+  const ownQuality = await readOwnQuality()
+  const hostQuality = typeof options?.quality === 'string' ? options.quality.trim().toLowerCase() : ''
+  // When the user has not chosen explicitly, honour a concrete host-supplied
+  // level (e.g. a future generic streaming-quality setting) if there is one.
+  const effective =
+    ownQuality === 'auto' && hostQuality && hostQuality !== 'auto' ? hostQuality : ownQuality
+  const qualities = qualityLadder(effective)
   for (const quality of qualities) {
     let directUrl = ''
     try {
@@ -1784,6 +1934,27 @@ async function getPlaybackUrl(track, options = {}, requestContext) {
     return proxyUrl
   }
   return null
+}
+
+// UrlGetVkey hands back a purl even for bitrates the account or the track cannot
+// actually serve, and the download then 404s. Verify before giving the URL to the
+// player, so the ladder can fall through instead of failing playback outright.
+async function verifyPlayableUrl(url, requestContext) {
+  if (!url) return false
+  try {
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+        signal: requestSignal(requestContext)
+      },
+      8000
+    )
+    return response.status === 200 || response.status === 206
+  } catch {
+    return false
+  }
 }
 
 async function resolveDirectUrl(songmid, mediaMid, quality, auth, requestContext) {
@@ -1809,14 +1980,22 @@ async function resolveDirectUrl(songmid, mediaMid, quality, auth, requestContext
   const info = midurlinfo.length
     ? midurlinfo.find((item) => String(item?.songmid || '') === songmid) || midurlinfo[0]
     : null
-  if (info?.purl) return normalizeHttpUrl(joinUrl(domain, info.purl))
+  if (info?.purl) {
+    const url = normalizeHttpUrl(joinUrl(domain, info.purl))
+    if (await verifyPlayableUrl(url, requestContext)) return url
+    logWarn(`QQ playback quality ${quality} is not downloadable; falling back`)
+    return ''
+  }
   if (info?.vkey && info?.filename) {
     const baseUrl = joinUrl(domain, String(info.filename))
     if (!baseUrl) return ''
     const separator = baseUrl.includes('?') ? '&' : '?'
-    return normalizeHttpUrl(
+    const url = normalizeHttpUrl(
       `${baseUrl}${separator}vkey=${encodeURIComponent(String(info.vkey))}&guid=${encodeURIComponent(guid)}&fromtag=66`
     )
+    if (await verifyPlayableUrl(url, requestContext)) return url
+    logWarn(`QQ playback quality ${quality} is not downloadable; falling back`)
+    return ''
   }
   return ''
 }
@@ -2237,7 +2416,16 @@ function mapTrack(item) {
   }
 }
 
-function mapPlaylist(item, fallbackCreator) {
+// Playlists returned by GetPlaylistByUin carry the owner's uin in `uin`; there is
+// no owner/isowner flag, so compare uin against the signed-in account instead.
+function isOwnedByViewer(item, viewerUin) {
+  const viewer = String(viewerUin ?? '').trim()
+  if (!viewer) return false
+  const owner = String(item?.uin ?? item?.creator_uin ?? item?.creatorUin ?? '').trim()
+  return Boolean(owner) && owner === viewer
+}
+
+function mapPlaylist(item, fallbackCreator, viewerUin) {
   if (!item || typeof item !== 'object') return null
   const id = String(
     item.dissid ||
@@ -2251,11 +2439,19 @@ function mapPlaylist(item, fallbackCreator) {
   ).trim()
   if (!id) return null
   const name = String(
-    item.dissname || item.diss_name || item.title || item.name || 'QQ 音乐歌单'
+    item.dissname ||
+      item.diss_name ||
+      item.dirName ||
+      item.dir_name ||
+      item.title ||
+      item.name ||
+      'QQ 音乐歌单'
   ).trim()
   const cover = normalizeHttpUrl(
     item.logo ||
       item.picurl ||
+      item.picUrl ||
+      item.bigpicUrl ||
       item.pic ||
       item.cover ||
       item.imgurl ||
@@ -2287,6 +2483,7 @@ function mapPlaylist(item, fallbackCreator) {
     cover: cover || null,
     trackCount: normalizeCount(
       item.songnum ||
+        item.songNum ||
         item.song_count ||
         item.num ||
         item.songCount ||
@@ -2294,7 +2491,12 @@ function mapPlaylist(item, fallbackCreator) {
         item.song_ids?.length
     ),
     creatorName: creatorName || undefined,
-    owned: item.owner === 1 || item.isowner === 1 || item.isOwner === 1 || type === 1,
+    owned:
+      item.owner === 1 ||
+      item.isowner === 1 ||
+      item.isOwner === 1 ||
+      type === 1 ||
+      isOwnedByViewer(item, viewerUin),
     qqType: type
   }
 }
@@ -2467,14 +2669,18 @@ function decodeLyric(value) {
 
 function qualityLadder(value) {
   const normalized = String(value || '').toLowerCase()
+  // "auto" prefers Hi-Res; verifyPlayableUrl drops to the next rung when a track
+  // has no Hi-Res master. An explicit "flac" stays at standard lossless.
   if (
-    normalized === 'flac' ||
-    normalized === 'ape' ||
-    normalized === 'lossless' ||
+    normalized === '' ||
+    normalized === 'auto' ||
     normalized === 'hires' ||
     normalized === 'hi-res' ||
     normalized === 'hi_res'
   ) {
+    return ['hires', 'flac', '320', '128']
+  }
+  if (normalized === 'flac' || normalized === 'ape' || normalized === 'lossless') {
     return ['flac', '320', '128']
   }
   if (normalized === '320' || normalized === 'high' || normalized === 'exhigh')
@@ -2505,7 +2711,13 @@ function normalizePlaylistId(value) {
 }
 
 function isLikedPlaylist(playlist) {
-  return playlist.id === '201' || playlist.qqType === 1 || playlist.name.includes('喜欢')
+  // Only an own playlist can be "我喜欢"; a collected playlist may legitimately
+  // carry the word 喜欢 in its title and must not be swallowed as the liked one.
+  return (
+    playlist.id === '201' ||
+    playlist.qqType === 1 ||
+    (playlist.owned === true && playlist.name.includes('喜欢'))
+  )
 }
 
 function firstArray(...values) {
