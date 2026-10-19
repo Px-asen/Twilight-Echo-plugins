@@ -101,15 +101,22 @@ test('search and playlist pagination map tracks and preserve server-scoped ident
     assert.equal(calls.at(-1).url.searchParams.get('StartIndex'), '10')
     const stream = new URL(await provider.getPlaybackUrl(page.items[0]))
     assert.equal(stream.pathname, '/jellyfin/Audio/10/universal')
-    assert.equal(stream.searchParams.get('api_key'), 'fixture-token')
+    assert.equal(stream.searchParams.get('ApiKey'), 'fixture-token')
     assert.equal(stream.searchParams.get('UserId'), 'u1')
+    assert.equal(stream.searchParams.get('api_key'), null)
     assert.equal(new URL(page.items[0].cover).pathname, '/jellyfin/Items/10/Images/Primary')
     assert.deepEqual(
       (await provider.fetchUserLibrary()).playlists.map((item) => item.id),
       ['@all', 'p1']
     )
+    assert.deepEqual(
+      (await provider.fetchUserLibrary()).likedPlaylist,
+      { id: '@favorite', name: 'Favorite', cover: null }
+    )
     assert.equal((await provider.fetchPlaylistTracks('p1')).length, 101)
     assert.equal((await provider.fetchPlaylistTracks('@all')).length, 101)
+    assert.equal((await provider.fetchPlaylistTracks('@favorite')).length, 101)
+    assert.equal(calls.at(-1).url.searchParams.get('IsFavorite'), 'true')
     await assert.rejects(provider.getPlaybackUrl({ id: 'jellyfin:other:10' }), /另一台/)
   }))
 

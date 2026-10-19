@@ -125,11 +125,13 @@ export async function activate(context) {
     const bitRate = audioStream.BitRate || item.TotalBitrate || mediaSource.Bitrate || null
     const format = (audioStream.Codec || item.Container || '').toUpperCase()
     const size = mediaSource.Size || item.Size || 0
+    const container = mediaSource.Container || item.Container || ''
     const genre = (item.Genres && item.Genres.length > 0) ? item.Genres.join(' / ') : ''
 
     // 音质评级判定 (Hi-Res / Lossless / HQ / SQ / Standard)
     let quality = 'Standard'
-    if ((bitDepth && bitDepth > 16) || (sampleRate && sampleRate > 48000)) {
+    // 严格口径：Hi-Res 需要采样率超过 48kHz（24bit/48kHz 计为 Lossless）
+    if (sampleRate && sampleRate > 48000) {
       quality = 'Hi-Res'
     } else if (['FLAC', 'ALAC', 'WAV', 'APE', 'AIFF'].includes(format)) {
       quality = 'Lossless'
@@ -148,6 +150,7 @@ export async function activate(context) {
       size,
       fileSize: size,
       quality,
+      container,
       genre
     }
 
@@ -177,6 +180,7 @@ export async function activate(context) {
       fileSize: size,
       bitRate,
       bitrate: bitRate,
+      container,
       quality,
 
       // 常见别名（下划线与大写兼容）
@@ -295,7 +299,7 @@ export async function activate(context) {
         callContext
       )
       return {
-        likedPlaylist: null,
+        likedPlaylist: { id: '@favorite', name: 'Favorite', cover: null },
         playlists: [
           { id: '@all', name: '全部音乐', cover: null },
           ...entries.map((item) => playlist(active, item))
@@ -310,6 +314,13 @@ export async function activate(context) {
             active,
             'Items',
             { Recursive: true, IncludeItemTypes: 'Audio', Fields: QUERY_FIELDS },
+            callContext
+          )
+          : playlistId === '@favorite'
+          ? await allPages(
+            active,
+            'Items',
+            { Recursive: true, IncludeItemTypes: 'Audio', IsFavorite: true, Fields: QUERY_FIELDS },
             callContext
           )
           : await allPages(
@@ -329,28 +340,30 @@ export async function activate(context) {
 
       const itemId = item.id.slice(prefix.length)
 
-      // 兼容 Node.js 单元测试环境
-      const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_TEST_CONTEXT
-      if (isTestEnv) {
-        const streamUrl = new URL(
-          `Audio/${encodeURIComponent(itemId)}/universal`,
-          active.serverUrl
-        )
-        streamUrl.searchParams.set('UserId', active.userId)
-        streamUrl.searchParams.set('DeviceId', 'twilight-echo-jellyfin')
-        streamUrl.searchParams.set('api_key', active.token)
-        return streamUrl.href
-      }
-
-      // 实机直接走原始文件直链串流，支持原生音频解码
+      // Jellyfin 12 移除了 `api_key` 查询参数与 `X-Emby-Token` 头；
+      // 播放器打开的 URL 用 `ApiKey` 查询参数携带访问令牌。
+      // 另外该版本的 universal 端点在缺省（无 Container）时会 500，
+      // 必须带上与源文件一致的 Container 才能返回直链。
+      const container = (item.container || item.mediaInfo?.container || '').toLowerCase()
       const streamUrl = new URL(
-        `Audio/${encodeURIComponent(itemId)}/stream`,
+        `Audio/${encodeURIComponent(itemId)}/universal`,
         active.serverUrl
       )
-      streamUrl.searchParams.set('static', 'true')
-      streamUrl.searchParams.set('api_key', active.token)
-      streamUrl.searchParams.set('X-Emby-Token', active.token)
-
+      streamUrl.searchParams.set('UserId', active.userId)
+      streamUrl.searchParams.set('DeviceId', 'twilight-echo-jellyfin')
+      streamUrl.searchParams.set('ApiKey', active.token)
+      if (container) streamUrl.searchParams.set('Container', container)
+      else {
+        // 兜底走服务器转码：Jellyfin 12.1 仅接受 mp3 转码组合
+        streamUrl.searchParams.set('EnableRedirection', 'false')
+        streamUrl.searchParams.set('AudioCodec', 'mp3')
+        streamUrl.searchParams.set('TranscodingContainer', 'mp3')
+      }
+      // 每次 resolve 生成唯一 PlaySessionId：重复播放同一首歌时，
+      // 宿主引擎看到相同 source 会走“重连旧流 + seek”捷径，而旧 HTTP 流
+      // 已到 EOF、连接已断，seek 返回 -1（“音频跳转失败”）。URL 唯一化
+      // 让引擎按全新 source 完整重开。Jellyfin 接受任意 PlaySessionId。
+      streamUrl.searchParams.set('PlaySessionId', `te-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
       return streamUrl.href
     }
   })

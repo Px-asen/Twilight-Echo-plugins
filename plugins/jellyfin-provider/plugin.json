@@ -1,7 +1,7 @@
 {
   "id": "com.twilightecho.provider.jellyfin",
   "name": "Jellyfin 音源",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "连接自己的 Jellyfin 音乐服务器，搜索歌曲、浏览音乐库和歌单。",
   "author": "Px-asen",
   "license": "Apache-2.0",
