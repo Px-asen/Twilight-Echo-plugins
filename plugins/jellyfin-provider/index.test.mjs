@@ -105,16 +105,22 @@ test('search and playlist pagination map tracks and preserve server-scoped ident
     assert.equal(stream.searchParams.get('UserId'), 'u1')
     assert.equal(stream.searchParams.get('api_key'), null)
     assert.equal(new URL(page.items[0].cover).pathname, '/jellyfin/Items/10/Images/Primary')
+    const library = await provider.fetchUserLibrary(false)
+    assert.deepEqual(library.playlists.map((item) => item.id), ['@all', 'p1'])
+    assert.equal(library.playlists[0].trackCount, 101)
     assert.deepEqual(
-      (await provider.fetchUserLibrary()).playlists.map((item) => item.id),
-      ['@all', 'p1']
+      library.likedPlaylist,
+      { id: '@favorite', name: '收藏', cover: null, trackCount: 101 }
     )
-    assert.deepEqual(
-      (await provider.fetchUserLibrary()).likedPlaylist,
-      { id: '@favorite', name: 'Favorite', cover: null }
-    )
+    const callsBeforeCached = calls.length
+    assert.equal((await provider.fetchUserLibrary(false)).playlists.length, library.playlists.length)
+    assert.equal(calls.length, callsBeforeCached)
+    assert.deepEqual((await provider.fetchUserLibrary(true)).likedPlaylist, library.likedPlaylist)
+    assert.ok(calls.length > callsBeforeCached)
     assert.equal((await provider.fetchPlaylistTracks('p1')).length, 101)
-    assert.equal((await provider.fetchPlaylistTracks('@all')).length, 101)
+    const allTracks = await provider.fetchPlaylistTracks('@all')
+    assert.equal(allTracks.length, 101)
+    assert.equal((await provider.fetchPlaylistTracks('@all')).length, allTracks.length)
     assert.equal((await provider.fetchPlaylistTracks('@favorite')).length, 101)
     assert.equal(calls.at(-1).url.searchParams.get('IsFavorite'), 'true')
     await assert.rejects(provider.getPlaybackUrl({ id: 'jellyfin:other:10' }), /另一台/)

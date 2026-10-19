@@ -3,6 +3,8 @@ const PAGE_SIZE = 100
 export async function activate(context) {
   let session = await context.settings.get('session')
   let revision = 0
+  const listCache = new Map()
+  const LIST_CACHE_TTL_MS = 10 * 60 * 1000
 
   function baseUrl(value) {
     const url = new URL(value)
@@ -290,24 +292,38 @@ export async function activate(context) {
       )
       return (page.Items || []).map((item) => track(active, item))
     },
-    fetchUserLibrary: async (_force, callContext) => {
+    fetchUserLibrary: async (force, callContext) => {
       const active = requireSession()
-      const entries = await allPages(
-        active,
-        'Items',
-        { Recursive: true, IncludeItemTypes: 'Playlist' },
-        callContext
-      )
-      return {
-        likedPlaylist: { id: '@favorite', name: 'Favorite', cover: null },
+      const cacheKey = `${active.serverUrl}:library`
+      const cached = listCache.get(cacheKey)
+      if (!force && cached && cached.revision === revision && Date.now() - cached.at < LIST_CACHE_TTL_MS)
+        return cached.result
+      const [entries, allPage, favoritePage] = await Promise.all([
+        allPages(
+          active,
+          'Items',
+          { Recursive: true, IncludeItemTypes: 'Playlist' },
+          callContext
+        ),
+        items(active, { Limit: 1 }, callContext),
+        items(active, { Limit: 1, IsFavorite: true }, callContext)
+      ])
+      const result = {
+        likedPlaylist: { id: '@favorite', name: '收藏', cover: null, trackCount: favoritePage.TotalRecordCount || 0 },
         playlists: [
-          { id: '@all', name: '全部音乐', cover: null },
+          { id: '@all', name: '全部音乐', cover: null, trackCount: allPage.TotalRecordCount || 0 },
           ...entries.map((item) => playlist(active, item))
         ]
       }
+      listCache.set(cacheKey, { revision, at: Date.now(), result })
+      return result
     },
-    fetchPlaylistTracks: async (playlistId, _force, callContext) => {
+    fetchPlaylistTracks: async (playlistId, force, callContext) => {
       const active = requireSession()
+      const cacheKey = `${active.serverUrl}:tracks:${playlistId}`
+      const cached = listCache.get(cacheKey)
+      if (!force && cached && cached.revision === revision && Date.now() - cached.at < LIST_CACHE_TTL_MS)
+        return cached.tracks
       const entries =
         playlistId === '@all'
           ? await allPages(
@@ -329,7 +345,9 @@ export async function activate(context) {
             { Fields: QUERY_FIELDS },
             callContext
           )
-      return entries.filter((item) => item.Type === 'Audio').map((item) => track(active, item))
+      const tracks = entries.filter((item) => item.Type === 'Audio').map((item) => track(active, item))
+      listCache.set(cacheKey, { revision, at: Date.now(), tracks })
+      return tracks
     },
     getPlaybackUrl: async (item, _options, callContext) => {
       callContext?.signal?.throwIfAborted()
