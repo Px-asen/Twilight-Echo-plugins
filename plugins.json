@@ -1213,6 +1213,38 @@
         "theme"
       ],
       "verified": true
+    },
+    {
+      "id": "com.twilightecho.tool.wallpaper-engine",
+      "name": "Wallpaper Engine 动态背景",
+      "version": "2.1.1",
+      "description": "在外观页选择本机 Wallpaper Engine 壁纸、画质与填充；视频/网页播放，场景由 WebWallGL 实时渲染，自动静音，网页可交互；读取壁纸属性并实时调整。",
+      "author": "Matsuki",
+      "license": "MIT",
+      "type": [
+        "tool",
+        "ui"
+      ],
+      "main": "index.mjs",
+      "engines": {
+        "twilightEcho": ">=1.2.0"
+      },
+      "apiVersion": 3,
+      "permissions": [
+        "filesystem:read",
+        "filesystem:write",
+        "settings",
+        "ui:inject"
+      ],
+      "repository": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine",
+      "sourceUrl": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine/releases/download/v2.1.1/com.twilightecho.tool.wallpaper-engine-2.1.1.tep",
+      "checksumSha256": "4bf10f1994c3eb2fab368fc4d4e85b325f6e3800fefd0bbf7cb222f5530286cd",
+      "tags": [
+        "tool",
+        "ui",
+        "community"
+      ],
+      "verified": false
     }
   ]
 }
