@@ -85,11 +85,12 @@
       "permissions": [
         "network",
         "settings",
-        "library:read"
+        "library:read",
+        "filesystem:write"
       ],
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "sourceUrl": "packages/com.twilightecho.provider.jellyfin-0.1.2.tep",
-      "checksumSha256": "d42c4dbcb1a9f771339537e1792fd6aaf2ea05cc6542bc9d9e2372179e03bf45",
+      "checksumSha256": "0ac9f5ade22d4260a752734a6a08d7f7a9c610228113e68b192314eae666d9bf",
       "tags": [
         "provider"
       ],

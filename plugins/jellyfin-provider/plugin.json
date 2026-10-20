@@ -11,6 +11,6 @@
     "twilightEcho": ">=1.2.2"
   },
   "apiVersion": 1,
-  "permissions": ["network", "settings", "library:read"],
+  "permissions": ["network", "settings", "library:read", "filesystem:write"],
   "repository": "https://github.com/Px-asen/Twilight-Echo-plugins"
 }

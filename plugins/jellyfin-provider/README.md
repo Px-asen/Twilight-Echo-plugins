@@ -11,5 +11,7 @@
 - https://typescript-sdk.jellyfin.org/classes/generated-client.AudioApi.html
 
 验证:`node --test plugins/jellyfin-provider/index.test.mjs`。用例覆盖登录、重启恢复、失败登录、分页、 favourite/playback 地址、 favourite 列表与取消操作。已联调 against Jellyfin 12.1 (本地 192.168.1.30 与公网 ofchar 服务器) :`/Items` + Authorization header 与 `IsFavorite=true` 服务端 favourite 过滤、封面地址、 universal 直链 (带源文件 `Container` )与 mp3转码兜链 均 200 返回真实 audio 数据。
+0.1.2 收藏：宿主 `likeTrack`/`isTrackLiked` 映射到服务端 `Users/{uid}/FavoriteItems/{id}`（POST/DELETE）与 `Items?Ids=&IsFavorite=true` 读过滤；宿主 `resolveProviderTrackId` 会剥掉 `jellyfin:` 前缀，故 `itemIdOf()` 同时接受 `jellyfin:<enc serverUrl>:<itemId>` 与 `<enc serverUrl>:<itemId>`，否则每次收藏都抛「另一台服务器」，连续 3 次会触发宿主 RPC 熔断（`circuit is open; retry after …ms`）并连带阻断播放。实机验证：收藏 26 条，toggle 往返正确。
+0.1.2 性能：`allPages` 由顺序翻页改为「首页取 TotalRecordCount + 8 并发按序合并」，页大小 250；`Fields` 去掉无人使用的 `PrimaryImageAspectRatio`。3569 首库实测 14.4s → 6.3s，条目元数据（采样率/位深/声道/码率/容器/文件大小）不变。
 
 构建：`node scripts/pack-plugin.cjs jellyfin-provider --twilight-root D:/Twilight_Echo-Pxasen`。插件源码不放入播放器主仓库。

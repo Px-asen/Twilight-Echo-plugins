@@ -1,11 +1,56 @@
-const PAGE_SIZE = 100
+import { readFile, rename, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+const PAGE_SIZE = 250
+const PAGE_CONCURRENCY = 8
+const LIST_CACHE_TTL_MS = 10 * 60 * 1000
+const CACHE_FILE = 'list-cache.json'
 
 export async function activate(context) {
   let session = await context.settings.get('session')
   let revision = 0
   const listCache = new Map()
-  const LIST_CACHE_TTL_MS = 10 * 60 * 1000
+  // 插件宿主空闲 5 分钟会被宿主回收，内存缓存随之消失；整库 3569 首的
+  // 映射结果写到插件数据目录，重启/唤醒后仍可命中，避免每次进库重拉。
+  const cachePath = context.storagePath ? join(context.storagePath, CACHE_FILE) : null
+  let persistQueue = Promise.resolve()
+  let hydrated = false
 
+  function cacheKeyFor(active, suffix) {
+    return `${active.serverUrl}|${active.userId}|${suffix}`
+  }
+
+  async function hydrateCache() {
+    if (hydrated || !cachePath) return
+    hydrated = true
+    try {
+      const raw = JSON.parse(await readFile(cachePath, 'utf-8'))
+      if (raw?.version !== 1 || !raw.entries || typeof raw.entries !== 'object') return
+      const now = Date.now()
+      for (const [key, entry] of Object.entries(raw.entries)) {
+        if (!entry || typeof entry !== 'object') continue
+        if (!(now - Number(entry.at) < LIST_CACHE_TTL_MS)) continue
+        listCache.set(key, { ...entry, revision })
+      }
+    } catch {
+      // 无缓存/损坏：忽略，按冷启动处理
+    }
+  }
+
+  function persistCache() {
+    if (!cachePath) return
+    persistQueue = persistQueue
+      .then(async () => {
+        const now = Date.now()
+        const entries = {}
+        for (const [key, entry] of listCache)
+          if (now - entry.at < LIST_CACHE_TTL_MS) entries[key] = entry
+        const tmp = `${cachePath}.tmp`
+        await writeFile(tmp, JSON.stringify({ version: 1, entries }), 'utf-8')
+        await rename(tmp, cachePath)
+      })
+      .catch(() => undefined)
+  }
   function baseUrl(value) {
     const url = new URL(value)
     if (
@@ -50,6 +95,21 @@ export async function activate(context) {
       throw new Error(`Jellyfin 请求失败（HTTP ${response.status}）`)
     }
     return response.status === 204 ? null : response.json()
+  }
+
+  // 宿主传入的标识有两种形态：
+  // - 播放/收藏列表里的完整 track id：`jellyfin:<enc serverUrl>:<itemId>`
+  // - provider 库接口（likeTrack/isTrackLiked）传的 local id：`<enc serverUrl>:<itemId>`
+  //   （宿主 resolveProviderTrackId 会剥掉 `jellyfin:` 前缀）
+  function itemIdOf(active, value) {
+    const raw = typeof value === 'string' ? value : value?.id
+    const scoped = typeof raw === 'string' && raw.startsWith('jellyfin:')
+      ? raw.slice('jellyfin:'.length)
+      : raw
+    const prefix = `${encodeURIComponent(active.serverUrl)}:`
+    if (typeof scoped !== 'string' || !scoped.startsWith(prefix))
+      throw new Error('这首歌曲属于另一台 Jellyfin 服务器，请连接对应服务器')
+    return scoped.slice(prefix.length)
   }
 
   function profile(user) {
@@ -207,7 +267,11 @@ export async function activate(context) {
     }
   }
 
-  const QUERY_FIELDS = 'PrimaryImageAspectRatio,MediaStreams,MediaSources,Path,Size,Genres,ChannelLayout'
+  // 只保留宿主真正读取的字段：MediaStreams 提供采样率/位深/声道/码率，
+  // MediaSources 是条目 Size（文件大小，宿主 TrackInfo 会显示）的唯一来源，
+  // Path 提供路径，Genres 提供风格。PrimaryImageAspectRatio 无人使用且让
+  // 每页体积近乎翻倍（实测 3569 首：2.24MB → 1.24MB/500），已移除。
+  const QUERY_FIELDS = 'MediaStreams,MediaSources,Path,Size,Genres,ChannelLayout'
 
   async function items(active, query, callContext) {
     return request(
@@ -226,25 +290,47 @@ export async function activate(context) {
     )
   }
 
+  // 顺序分页在 3569 首的库上要 36 个来回（实测 14.4s）。先取首页拿到
+  // TotalRecordCount，再按固定并发把剩余页并发拉取并保持原始顺序。
   async function allPages(active, path, query, callContext) {
-    const result = []
-    for (let offset = 0; ; offset += PAGE_SIZE) {
-      const page = await request(
+    const fetchPage = (offset) =>
+      request(
         active,
         path,
         { UserId: active.userId, Limit: PAGE_SIZE, StartIndex: offset, ...query },
         {},
         callContext
       )
-      const entries = page.Items || []
-      result.push(...entries)
-      if (
-        entries.length === 0 ||
-        result.length >= (page.TotalRecordCount ?? Infinity) ||
-        entries.length < PAGE_SIZE
-      )
-        return result
+
+    const first = await fetchPage(0)
+    const result = [...(first.Items || [])]
+    const total = first.TotalRecordCount
+    if (result.length === 0 || result.length < PAGE_SIZE) return result
+    if (typeof total !== 'number') {
+      // 服务器没给总数：退回顺序分页
+      for (let offset = PAGE_SIZE; ; offset += PAGE_SIZE) {
+        const page = await fetchPage(offset)
+        const entries = page.Items || []
+        result.push(...entries)
+        if (entries.length < PAGE_SIZE) return result
+      }
     }
+    if (result.length >= total) return result
+
+    const offsets = []
+    for (let offset = PAGE_SIZE; offset < total; offset += PAGE_SIZE) offsets.push(offset)
+    const pages = new Array(offsets.length)
+    let cursor = 0
+    await Promise.all(
+      Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, async () => {
+        while (cursor < offsets.length) {
+          const index = cursor++
+          pages[index] = (await fetchPage(offsets[index])).Items || []
+        }
+      })
+    )
+    for (const page of pages) result.push(...page)
+    return result
   }
 
   await context.twilight.providers.register({
@@ -294,10 +380,9 @@ export async function activate(context) {
     },
     fetchUserLibrary: async (force, callContext) => {
       const active = requireSession()
-      const cacheKey = `${active.serverUrl}:library`
-      const cached = listCache.get(cacheKey)
-      if (!force && cached && cached.revision === revision && Date.now() - cached.at < LIST_CACHE_TTL_MS)
-        return cached.result
+      await hydrateCache()
+      // 库摘要只有 3 个请求（实测 ~130ms），刻意不缓存：收藏数/全部音乐数
+      // 必须每次与服务端一致，否则头部会显示旧的 25 项、列表却是新的 26 首。
       const [entries, allPage, favoritePage] = await Promise.all([
         allPages(
           active,
@@ -305,25 +390,24 @@ export async function activate(context) {
           { Recursive: true, IncludeItemTypes: 'Playlist' },
           callContext
         ),
-        items(active, { Limit: 1 }, callContext),
-        items(active, { Limit: 1, IsFavorite: true }, callContext)
+        items(active, { Limit: 1, Fields: '' }, callContext),
+        items(active, { Limit: 1, Fields: '', IsFavorite: true }, callContext)
       ])
-      const result = {
+      return {
         likedPlaylist: { id: '@favorite', name: '收藏', cover: null, trackCount: favoritePage.TotalRecordCount || 0 },
         playlists: [
           { id: '@all', name: '全部音乐', cover: null, trackCount: allPage.TotalRecordCount || 0 },
           ...entries.map((item) => playlist(active, item))
         ]
       }
-      listCache.set(cacheKey, { revision, at: Date.now(), result })
-      return result
     },
     fetchPlaylistTracks: async (playlistId, force, callContext) => {
       const active = requireSession()
-      const cacheKey = `${active.serverUrl}:tracks:${playlistId}`
+      await hydrateCache()
+      const cacheKey = cacheKeyFor(active, `tracks:${playlistId}`)
       const cached = listCache.get(cacheKey)
-      if (!force && cached && cached.revision === revision && Date.now() - cached.at < LIST_CACHE_TTL_MS)
-        return cached.tracks
+      if (!force && cached?.revision === revision && Date.now() - cached.at < LIST_CACHE_TTL_MS)
+        return cached.value
       const entries =
         playlistId === '@all'
           ? await allPages(
@@ -346,17 +430,14 @@ export async function activate(context) {
             callContext
           )
       const tracks = entries.filter((item) => item.Type === 'Audio').map((item) => track(active, item))
-      listCache.set(cacheKey, { revision, at: Date.now(), tracks })
+      listCache.set(cacheKey, { revision, at: Date.now(), value: tracks })
+      persistCache()
       return tracks
     },
     getPlaybackUrl: async (item, _options, callContext) => {
       callContext?.signal?.throwIfAborted()
       const active = requireSession()
-      const prefix = `jellyfin:${encodeURIComponent(active.serverUrl)}:`
-      if (!item.id?.startsWith(prefix))
-        throw new Error('这首歌曲属于另一台 Jellyfin 服务器，请连接对应服务器')
-
-      const itemId = item.id.slice(prefix.length)
+      const itemId = itemIdOf(active, item)
 
       // Jellyfin 12 移除了 `api_key` 查询参数与 `X-Emby-Token` 头；
       // 播放器打开的 URL 用 `ApiKey` 查询参数携带访问令牌。
@@ -383,6 +464,34 @@ export async function activate(context) {
       // 让引擎按全新 source 完整重开。Jellyfin 接受任意 PlaySessionId。
       streamUrl.searchParams.set('PlaySessionId', `te-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
       return streamUrl.href
+    },
+    likeTrack: async (item, liked, callContext) => {
+      callContext?.signal?.throwIfAborted()
+      const active = requireSession()
+      const id = typeof item === 'string' ? item : item?.id
+      const itemId = itemIdOf(active, item)
+      await request(
+        active,
+        `Users/${active.userId}/FavoriteItems/${encodeURIComponent(itemId)}`,
+        {},
+        { method: liked ? 'POST' : 'DELETE' },
+        callContext
+      )
+      // 收藏状态变化会让收藏列表与库计数失效（键现在是 serverUrl|userId|suffix）
+      for (const key of [...listCache.keys()])
+        if (key.startsWith(`${active.serverUrl}|${active.userId}|`)) listCache.delete(key)
+      persistCache()
+      return { id, liked }
+    },
+    isTrackLiked: async (item, callContext) => {
+      const active = requireSession()
+      const itemId = itemIdOf(active, item)
+      const page = await items(
+        active,
+        { Ids: itemId, IsFavorite: true, Limit: 1 },
+        callContext
+      )
+      return (page.Items || []).some((entry) => entry.Id === itemId)
     }
   })
 }
