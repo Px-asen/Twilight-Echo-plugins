@@ -1,0 +1,46 @@
+.music-boot-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 900;
+  overflow: hidden;
+  background: transparent;
+  outline: none;
+}
+.music-app .music-boot-skip {
+  position: absolute;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  opacity: .65;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: .12em;
+  white-space: nowrap;
+  cursor: pointer;
+  z-index: 2;
+}
+.music-boot-skip:hover, .music-boot-skip:focus-visible { opacity: 1; }
+.music-boot-skip:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.music-opening { position: absolute; inset: 0; color: var(--ink); pointer-events: none; }
+.music-opening-paper { position: absolute; inset: 0; background: var(--page-bg); }
+.music-opening-caption {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max-content;
+  max-width: calc(100% - 40px);
+  transform: translate(-50%, -50%);
+  padding-left: .18em;
+  font-size: clamp(14px, 1.6vw, 22px);
+  font-weight: 450;
+  line-height: 1.5;
+  letter-spacing: .18em;
+  text-align: center;
+  white-space: nowrap;
+}

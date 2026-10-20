@@ -1,0 +1,49 @@
+name: Publish R2 distribution
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - plugins.json
+      - packages/**
+      - r2.json
+      - scripts/build-r2.mjs
+      - scripts/deploy-r2.mjs
+      - scripts/r2.test.mjs
+      - package.json
+      - pnpm-lock.yaml
+      - .github/workflows/r2-distribution.yml
+  workflow_dispatch:
+  # GITHUB_TOKEN's discovery commits do not trigger push workflows.
+  workflow_run:
+    workflows: [Discover community plugins]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r2-production
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:r2
+      - name: Publish packages, then the index
+        run: pnpm run deploy:r2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}

@@ -1,0 +1,8 @@
+{
+  "accountId": "ace55c35956b7707f3387f46289ea0d2",
+  "bucket": "twilight-echo-plugins",
+  "publicBaseUrl": "https://plugins.aaapi.fun/",
+  "excludedPlugins": {
+    "com.twilightecho.theme.miku-navigation": "Local preview artwork has no public redistribution grant; see plugins/miku-navigation/LICENSE."
+  }
+}

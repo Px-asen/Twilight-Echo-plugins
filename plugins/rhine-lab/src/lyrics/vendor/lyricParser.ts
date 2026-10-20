@@ -1,0 +1,400 @@
+// Plugin adaptations (2026-10-18): one-digit fractions and explicit empty interlude rows.
+import type { LyricWord, LyricVoiceMetadata, ParsedTimedLyricLine } from './lyricTypes.ts'
+
+const LINE_TIMESTAMP_RE = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g
+const WORD_TIMESTAMP_RE = /<(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?>/g
+const YRC_LINE_RE = /^\[(\d+),(\d+)\](.*)$/
+const YRC_WORD_RE = /\((\d+),(\d+),\d+\)([^()[\]]*)/g
+const VOICE_TAG_RE = /\[te:voice\s+([^\]]+)\]/g
+const VOICE_VALUE_RE = /^(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+$/
+const VOICE_VALUE_MAX_LENGTH = 96
+/** NetEase lyric/new metadata & prose lines: {"t":-1,"c":[{"tx":"作词: "},{"tx":"ACO"}]} */
+const NETEASE_JSON_LINE_RE = /^\s*\{[\s\S]*"c"\s*:\s*\[[\s\S]*\]\s*\}\s*$/
+
+function parseVoiceValue(raw: string): string | null {
+  if (!raw || !VOICE_VALUE_RE.test(raw)) return null
+  try {
+    const decoded = decodeURIComponent(raw)
+    if (
+      !decoded ||
+      decoded.length > VOICE_VALUE_MAX_LENGTH ||
+      [...decoded].some((character) => character.codePointAt(0)! < 0x20 || character === '\u007f')
+    ) {
+      return null
+    }
+    return decoded
+  } catch {
+    return null
+  }
+}
+
+export function parseLyricVoiceTag(raw: string): LyricVoiceMetadata | null {
+  const match = /^\[te:voice\s+([^\]]+)\]$/.exec(raw)
+  if (!match) return null
+
+  const values = new Map<string, string>()
+  for (const attribute of match[1].trim().split(/\s+/)) {
+    const separator = attribute.indexOf('=')
+    if (separator <= 0 || separator === attribute.length - 1) return null
+    const key = attribute.slice(0, separator)
+    const value = attribute.slice(separator + 1)
+    if (!['role', 'lane', 'speaker', 'group'].includes(key) || values.has(key)) return null
+    values.set(key, value)
+  }
+
+  const role = values.get('role')
+  const lane = values.get('lane')
+  if (role !== 'lead' && role !== 'background' && role !== 'harmony') return null
+  if (lane !== 'center' && lane !== 'start' && lane !== 'end') return null
+
+  const speakerRaw = values.get('speaker')
+  const groupRaw = values.get('group')
+  const speaker = speakerRaw == null ? undefined : parseVoiceValue(speakerRaw)
+  const group = groupRaw == null ? undefined : parseVoiceValue(groupRaw)
+  if ((speakerRaw != null && speaker == null) || (groupRaw != null && group == null)) return null
+
+  return { role, lane, ...(speaker ? { speaker } : {}), ...(group ? { group } : {}) }
+}
+
+function encodeVoiceValue(value: string): string {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  )
+}
+
+export function serializeLyricVoiceTag(metadata: LyricVoiceMetadata): string {
+  const attributes = [`role=${metadata.role}`, `lane=${metadata.lane}`]
+  if (metadata.speaker) attributes.push(`speaker=${encodeVoiceValue(metadata.speaker)}`)
+  if (metadata.group) attributes.push(`group=${encodeVoiceValue(metadata.group)}`)
+  return `[te:voice ${attributes.join(' ')}]`
+}
+
+export function extractLyricVoiceTag(raw: string): {
+  text: string
+  metadata: LyricVoiceMetadata | null
+} {
+  const matches: Array<{ match: RegExpExecArray; metadata: LyricVoiceMetadata }> = []
+  for (const match of raw.matchAll(VOICE_TAG_RE)) {
+    const metadata = parseLyricVoiceTag(match[0])
+    if (metadata) matches.push({ match, metadata })
+  }
+  if (matches.length !== 1) return { text: raw, metadata: null }
+  const { match, metadata } = matches[0]
+  const start = match.index ?? 0
+  return {
+    text: `${raw.slice(0, start)}${raw.slice(start + match[0].length)}`,
+    metadata
+  }
+}
+
+export function stripValidLyricVoiceTags(lyrics: string | null | undefined): string | null {
+  if (lyrics == null) return null
+  return lyrics
+    .split('\n')
+    .map((line) => extractLyricVoiceTag(line).text)
+    .join('\n')
+}
+
+export interface LyricVoiceDraftRow {
+  sourceIndex: number
+  raw: string
+  text: string
+  metadata: LyricVoiceMetadata | null
+}
+
+export interface LyricVoiceDraftUpdate {
+  sourceIndex: number
+  metadata: LyricVoiceMetadata | null
+}
+
+export function parseLyricVoiceDraftRows(lyrics: string): LyricVoiceDraftRow[] {
+  return lyrics.split('\n').map((raw, sourceIndex) => {
+    const extracted = extractLyricVoiceTag(raw)
+    const text = extracted.text
+      .replace(LINE_TIMESTAMP_RE, '')
+      .replace(WORD_TIMESTAMP_RE, '')
+      .replace(YRC_LINE_RE, '$3')
+      .replace(YRC_WORD_RE, '$3')
+      .trim()
+    return { sourceIndex, raw, text, metadata: extracted.metadata }
+  })
+}
+
+export function rewriteLyricVoiceDraftRows(
+  lyrics: string,
+  updates: readonly LyricVoiceDraftUpdate[]
+): string {
+  const byIndex = new Map(updates.map((update) => [update.sourceIndex, update.metadata]))
+  return lyrics
+    .split('\n')
+    .map((raw, sourceIndex) => {
+      if (!byIndex.has(sourceIndex)) return raw
+      const extracted = extractLyricVoiceTag(raw)
+      const metadata = byIndex.get(sourceIndex)
+      const tag = metadata ? serializeLyricVoiceTag(metadata) : ''
+      const timestampMatch = /^(?:(?:\[\d{1,3}:\d{2}(?:[.:]\d{2,3})?\])+|\[\d+,\d+\])/.exec(
+        extracted.text
+      )
+      const insertion = timestampMatch?.[0].length ?? 0
+      return `${extracted.text.slice(0, insertion)}${tag}${extracted.text.slice(insertion)}`
+    })
+    .join('\n')
+}
+
+function parseTimestampParts(min: string, sec: string, frac?: string): number {
+  let ms = 0
+  if (frac) {
+    ms = Number.parseInt(frac, 10)
+    if (frac.length === 2) ms *= 10
+    else if (frac.length === 1) ms *= 100
+  }
+  return Number.parseInt(min, 10) * 60 + Number.parseInt(sec, 10) + ms / 1000
+}
+
+/**
+ * Flatten NetEase JSON lyric fragments (`tx` tokens) into display text.
+ * Returns null when the line is not that format.
+ */
+export function parseNeteaseJsonLyricLine(
+  raw: string
+): { time: number | null; text: string } | null {
+  const trimmed = raw.trim()
+  if (!trimmed || trimmed[0] !== '{' || !NETEASE_JSON_LINE_RE.test(trimmed)) return null
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      t?: unknown
+      c?: Array<{ tx?: unknown } | null> | null
+    }
+    if (!Array.isArray(parsed.c)) return null
+    const text = parsed.c
+      .map((part) => (part && typeof part.tx === 'string' ? part.tx : ''))
+      .join('')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!text) return null
+    const timeMs = typeof parsed.t === 'number' && Number.isFinite(parsed.t) ? parsed.t : null
+    // t < 0 is NetEase credit / static metadata (作词 / 作曲 / 制作), not a playhead time.
+    const time = timeMs != null && timeMs >= 0 ? timeMs / 1000 : null
+    return { time, text }
+  } catch {
+    return null
+  }
+}
+
+function isRawNeteaseJsonLyricLine(raw: string): boolean {
+  const trimmed = raw.trim()
+  return trimmed.startsWith('{') && NETEASE_JSON_LINE_RE.test(trimmed)
+}
+
+function parseEnhancedWords(rawLine: string): { text: string; words: LyricWord[] } | null {
+  WORD_TIMESTAMP_RE.lastIndex = 0
+  if (!WORD_TIMESTAMP_RE.test(rawLine)) return null
+
+  const timestamps: Array<{ time: number; index: number; end: number }> = []
+  let match: RegExpExecArray | null
+  WORD_TIMESTAMP_RE.lastIndex = 0
+  while ((match = WORD_TIMESTAMP_RE.exec(rawLine)) !== null) {
+    timestamps.push({
+      time: parseTimestampParts(match[1], match[2], match[3]),
+      index: match.index,
+      end: match.index + match[0].length
+    })
+  }
+  if (timestamps.length === 0) return null
+
+  const words: LyricWord[] = []
+  let plain = ''
+  for (let i = 0; i < timestamps.length; i++) {
+    const current = timestamps[i]
+    const next = timestamps[i + 1]
+    const text = rawLine.slice(current.end, next?.index ?? rawLine.length)
+    if (!text) continue
+    words.push({
+      time: current.time,
+      endTime: next?.time ?? null,
+      text
+    })
+    plain += text
+  }
+  const cleaned = plain.replace(LINE_TIMESTAMP_RE, '').trim()
+  if (!cleaned || words.length === 0) return null
+  return { text: cleaned, words }
+}
+
+/** NetEase YRC: [startMs,durationMs](wordStart,wordDur,0)word... plus JSON credit lines. */
+export function parseYrc(yrc: string | null | undefined): ParsedTimedLyricLine[] {
+  if (!yrc) return []
+  const timed: ParsedTimedLyricLine[] = []
+  const credits: ParsedTimedLyricLine[] = []
+  for (const raw of yrc.split('\n')) {
+    const trimmed = raw.trim()
+    if (!trimmed) continue
+
+    const jsonLine = parseNeteaseJsonLyricLine(trimmed)
+    if (jsonLine) {
+      if (jsonLine.time != null) {
+        timed.push({ time: jsonLine.time, text: jsonLine.text })
+      } else {
+        // Credits (t:-1) are shown once at the top with t=0 so they don't scroll as timed lines.
+        credits.push({ time: 0, text: jsonLine.text })
+      }
+      continue
+    }
+    if (isRawNeteaseJsonLyricLine(trimmed)) continue
+
+    const lineMatch = YRC_LINE_RE.exec(trimmed)
+    if (!lineMatch) continue
+    const lineStartMs = Number.parseInt(lineMatch[1], 10)
+    const extracted = extractLyricVoiceTag(lineMatch[3] ?? '')
+    const body = extracted.text
+    const words: LyricWord[] = []
+    let plain = ''
+    let wordMatch: RegExpExecArray | null
+    YRC_WORD_RE.lastIndex = 0
+    while ((wordMatch = YRC_WORD_RE.exec(body)) !== null) {
+      const startMs = Number.parseInt(wordMatch[1], 10)
+      const durMs = Number.parseInt(wordMatch[2], 10)
+      const text = wordMatch[3] ?? ''
+      if (!text) continue
+      words.push({
+        time: startMs / 1000,
+        endTime: (startMs + durMs) / 1000,
+        text
+      })
+      plain += text
+    }
+    if (!plain.trim()) continue
+    timed.push({
+      time: lineStartMs / 1000,
+      text: plain,
+      words: words.length > 0 ? words : undefined,
+      ...(extracted.metadata ? { voice: extracted.metadata } : {})
+    })
+  }
+  timed.sort((a, b) => a.time - b.time)
+  // Keep credit lines first so "作词 / 作曲" appear above the first sung line.
+  return credits.length > 0 ? [...credits, ...timed] : timed
+}
+
+export function parseTimedLrc(lrc: string | null | undefined): ParsedTimedLyricLine[] {
+  if (!lrc) return []
+
+  const hasYrcWords = /^\[\d+,\d+\]/m.test(lrc) && /\(\d+,\d+,\d+\)/.test(lrc)
+  const hasNeteaseJsonCredits = /"tx"\s*:/.test(lrc) && /"c"\s*:\s*\[/.test(lrc)
+
+  // Prefer YRC when the payload looks like NetEase word lyrics. JSON credit lines
+  // (作词/作曲) are also handled inside parseYrc when mixed with YRC.
+  if (hasYrcWords || (hasNeteaseJsonCredits && hasYrcWords)) {
+    const yrc = parseYrc(lrc)
+    if (yrc.length > 0) return yrc
+  }
+
+  const lines: ParsedTimedLyricLine[] = []
+  const credits: ParsedTimedLyricLine[] = []
+  const lineRe = LINE_TIMESTAMP_RE
+
+  for (const raw of lrc.split('\n')) {
+    const trimmed = raw.trim()
+    if (!trimmed) continue
+
+    const jsonLine = parseNeteaseJsonLyricLine(trimmed)
+    if (jsonLine) {
+      if (jsonLine.time != null) {
+        lines.push({ time: jsonLine.time, text: jsonLine.text })
+      } else {
+        credits.push({ time: 0, text: jsonLine.text })
+      }
+      continue
+    }
+    if (isRawNeteaseJsonLyricLine(trimmed)) continue
+
+    const extracted = extractLyricVoiceTag(trimmed)
+    const source = extracted.text
+    const timestamps: Array<{ time: number; index: number; end: number }> = []
+    let match: RegExpExecArray | null
+    lineRe.lastIndex = 0
+
+    while ((match = lineRe.exec(source)) !== null) {
+      timestamps.push({
+        time: parseTimestampParts(match[1], match[2], match[3]),
+        index: match.index,
+        end: match.index + match[0].length
+      })
+    }
+
+    const enhanced = parseEnhancedWords(source)
+    if (enhanced) {
+      const lineTime = timestamps[0]?.time ?? enhanced.words[0]?.time ?? 0
+      lines.push({
+        time: lineTime,
+        text: enhanced.text,
+        words: enhanced.words,
+        ...(extracted.metadata ? { voice: extracted.metadata } : {})
+      })
+      continue
+    }
+
+    const text = source.replace(lineRe, '').trim()
+    if (timestamps.length === 0) continue
+
+    const hasInlineTimestamps = timestamps.some((timestamp, index) => {
+      if (index === 0) return timestamp.index > 0
+      const previous = timestamps[index - 1]
+      return source.slice(previous.end, timestamp.index).trim().length > 0
+    })
+
+    if (hasInlineTimestamps) {
+      // Legacy multi-tag-with-text mid-line without Enhanced markers: keep line-level only.
+      lines.push({
+        time: timestamps[0].time,
+        text,
+        ...(extracted.metadata ? { voice: extracted.metadata } : {})
+      })
+      continue
+    }
+
+    for (const ts of timestamps) {
+      lines.push({
+        time: ts.time,
+        text,
+        ...(extracted.metadata ? { voice: extracted.metadata } : {})
+      })
+    }
+  }
+
+  lines.sort((a, b) => a.time - b.time)
+  return credits.length > 0 ? [...credits, ...lines] : lines
+}
+
+interface ParsedPlainLyricLine {
+  text: string
+  voice?: LyricVoiceMetadata
+}
+
+export function parsePlainLyricLines(lyrics: string | null | undefined): ParsedPlainLyricLine[] {
+  if (!lyrics) return []
+
+  const timeTagRe = /\[\d{1,3}:\d{2}(?:[.:]\d{2,3})?\]/g
+  const wordTagRe = /<\d{1,3}:\d{2}(?:[.:]\d{2,3})?>/g
+  const metadataTagRe = /^\[[a-zA-Z]+:.*\]$/
+  const result: ParsedPlainLyricLine[] = []
+
+  for (const line of lyrics.split('\n')) {
+    const jsonLine = parseNeteaseJsonLyricLine(line)
+    if (jsonLine) {
+      result.push({ text: jsonLine.text })
+      continue
+    }
+    if (isRawNeteaseJsonLyricLine(line)) continue
+    const extracted = extractLyricVoiceTag(line)
+    const text = extracted.text.replace(timeTagRe, '').replace(wordTagRe, '').trim()
+    if (!text || metadataTagRe.test(text)) continue
+    result.push({ text, ...(extracted.metadata ? { voice: extracted.metadata } : {}) })
+  }
+  return result
+}
+
+export function parsePlainLyrics(lyrics: string | null | undefined): string[] {
+  return parsePlainLyricLines(lyrics).map((line) => line.text)
+}

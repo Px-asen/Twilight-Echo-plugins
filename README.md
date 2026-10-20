@@ -1,7 +1,29 @@
 # Twilight Echo Plugins
 
-This repository hosts Twilight Echo plugins and the static plugin index used by
-the app's plugin marketplace.
+This repository hosts the `plugins.json` directory used by Twilight Echo's in-app marketplace. Its `plugins/` and `packages/` folders contain plugins maintained here. Independent developers keep their source code, README, and release assets in their own public repositories.
+
+## Publish an independent plugin
+
+You do not need to fork this directory or submit a pull request for automatic discovery:
+
+1. Create a public GitHub repository for your plugin. Keep its source and a README there. Set `plugin.json.repository` to its exact URL, for example `https://github.com/example/twilight-lyrics` (no trailing slash).
+2. Build a `.tep` package with `plugin.json` at the archive root. Name it `<plugin-id>-<version>.tep`, matching the manifest exactly. See the [plugin development guide](https://github.com/Px-asen/Twilight_Echo/blob/Pxasen/docs/PLUGIN_README.md) for a complete manifest and packaging command.
+3. Create a GitHub Release tagged `<version>` or `v<version>`. Attach **exactly one** `.tep` asset, no larger than 50 MiB. Add the repository Topic `twilight-echo-plugin`.
+4. The [discovery workflow](.github/workflows/community-discovery.yml) scans the latest Release every six hours and updates `community.json` and `plugins.json`. Once the entry appears in [`plugins.json`](plugins.json), users can refresh the Extension Center and search for it. The scheduled run may be delayed.
+
+Automatic entries have the `community` tag and display as **unverified**. The scanner checks the package, URL, manifest, and size; it does not execute plugin code or perform a human review. A plugin ID stays bound to its first discovered repository, so publish updates from the same repository with an increased version. Replacing a package without changing its version is rejected. Invalid or missing releases are omitted until fixed.
+
+## Enable automatic discovery (directory maintainers)
+
+In this repository's **Settings → Actions → General**, enable Actions and set **Workflow permissions** to **Read and write permissions**. The `Discover community plugins` workflow runs on `main` every six hours and can also be started from the **Actions** tab with **Run workflow**. It uses the repository's built-in `GITHUB_TOKEN`; no separate secret is needed. The workflow commits changed `community.json` and `plugins.json` directly to `main`, so branch rules must permit that push. Check the workflow run and the generated index after enabling it.
+
+## Request a reviewed listing
+
+If you want a human-reviewed listing, submit a pull request with `catalog/<plugin-id>.json` and the regenerated `plugins.json`. Follow [catalog/README.md](catalog/README.md). The pull request workflow checks the package and index; maintainers review its README, permissions, and basic behavior. Reviewed catalog entries take precedence over automatic entries with the same ID. Review alone does not grant the “officially verified” badge, which requires a valid publisher signature.
+
+## Update an existing plugin
+
+Increase `plugin.json.version`, rebuild the `.tep`, and publish a new Release in the same repository with the matching tag and filename. The next discovery run replaces the previous community entry. For a reviewed listing, also update `catalog/<plugin-id>.json` and `plugins.json` in a new pull request. Do not edit `community.json` by hand.
 
 ## Repository Layout
 
@@ -13,6 +35,11 @@ plugins/
     index.test.mjs
     README.md
   ytmusic-provider/
+    plugin.json
+    index.mjs
+    index.test.mjs
+    README.md
+  navidrome-provider/
     plugin.json
     index.mjs
     index.test.mjs
@@ -36,14 +63,19 @@ plugins/
     THIRD_PARTY_NOTICES.md
 packages/
   com.twilightecho.provider.bilibili-0.1.13.tep
-  com.twilightecho.provider.qqmusic-0.2.1.tep
+  com.twilightecho.provider.qqmusic-0.3.2.tep
   com.twilightecho.provider.kugou-0.2.3.tep
   com.twilightecho.provider.ytmusic-1.0.5.tep
+  com.twilightecho.provider.navidrome-1.0.0.tep
+catalog/                   # reviewed independent plugins, one JSON file per plugin
+community.json             # automatically discovered plugins and ID ownership history
 plugins.json
 ```
 
 - `plugins/<name>/` contains plugin source code.
 - `packages/` contains installable `.tep` packages.
+- `catalog/` contains reviewed listings for independent repositories.
+- `community.json` is maintained by the discovery workflow.
 - `plugins.json` is the schemaVersion 1 plugin index consumed by Twilight Echo.
 
 ## Current Plugins
@@ -161,13 +193,23 @@ $env:TWILIGHT_ECHO_ROOT="D:\Twilight_Echo-Pxasen"
 pnpm run pack:qishui
 ```
 
+To package the Navidrome provider specifically:
+
+```powershell
+$env:TWILIGHT_ECHO_ROOT="D:\Project\Twilight_Echo"
+pnpm run pack:navidrome
+```
+
+This creates `packages/com.twilightecho.provider.navidrome-1.0.0.tep` and refreshes
+`plugins.json`.
+
 `pnpm run pack` creates or updates:
 
-- `packages/com.twilightecho.provider.bilibili-0.1.13.tep`
+- `packages/com.twilightecho.provider.bilibili-0.1.15.tep`
 - `plugins.json`
 
 `pnpm run pack:qqmusic` creates or updates
-`packages/com.twilightecho.provider.qqmusic-0.2.1.tep` and then refreshes
+`packages/com.twilightecho.provider.qqmusic-0.3.2.tep` and then refreshes
 `plugins.json`.
 
 `pnpm run pack:kugou` creates or updates
@@ -189,8 +231,110 @@ pnpm run dev
 ```
 
 The index uses relative package URLs such as
-`packages/com.twilightecho.provider.bilibili-0.1.13.tep`, so Twilight Echo
+`packages/com.twilightecho.provider.bilibili-0.1.15.tep`, so Twilight Echo
 resolves the package from the same GitHub raw base URL.
+
+## Publish to Cloudflare R2
+
+Production distribution uses `https://plugins.aaapi.fun/plugins.json`, backed by
+the `twilight-echo-plugins` R2 Standard bucket in Asia-Pacific. The source index
+and original GitHub URLs stay unchanged for existing clients.
+
+When publishing a plugin, rebuild its package and source index as usual, then push
+to `main`. [Publish R2 distribution](.github/workflows/r2-distribution.yml) uploads
+the referenced packages first and replaces the public index last. It also runs
+after successful community discovery, including discovery commits made with
+`GITHUB_TOKEN`. Manual redeploys use **Actions → Publish R2 distribution → Run workflow**.
+
+To inspect a distribution locally without credentials:
+
+```sh
+pnpm run build:r2
+```
+
+`dist/r2/plugins.json` references only R2-relative, content-addressed package
+filenames. The build copies local packages, downloads community packages, and
+verifies every archive against the original `checksumSha256`. It never runs
+plugin code. `dist/r2/deployment.json` records the upload inventory and exclusions;
+that file is not published. Source files, old packages, and local previews are not
+uploaded. The Miku navigation preview is excluded in `r2.json` because its artwork
+has no public redistribution grant. Resolve that permission before removing its
+exclusion.
+
+`r2.json` contains only public configuration. The repository's Actions secrets
+`R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` hold an R2 **Object Read & Write**
+credential scoped only to this bucket. No account/DNS administration permission
+is needed. For a local upload, provide those environment variables through your
+secret manager and run `pnpm run deploy:r2`; never put credentials in source or
+command-line arguments.
+
+The custom domain must belong to the same Cloudflare account as the bucket.
+Bind `plugins.aaapi.fun` in **R2 → twilight-echo-plugins → Settings → Custom Domains**.
+Public development access (`r2.dev`) is not used for production. Cache Rules must
+make the following resources **Eligible for cache**, respecting origin cache headers:
+
+- Host `plugins.aaapi.fun`, path `/plugins.json`: `public, max-age=60`.
+- Host `plugins.aaapi.fun`, path starts with `/packages/`: `public, max-age=31536000, immutable`.
+
+Only package filenames containing their SHA-256 receive immutable caching. The
+publisher refuses to overwrite an existing package with unexpected metadata and
+does not delete old objects, so cached indexes and installed older clients retain
+their referenced packages. To roll back the catalog, revert the source index to
+the desired versions and run the publish workflow; the index cache expires within
+60 seconds. `verified` claims keep their original meaning. If publisher signatures
+are added later, the R2 build stops until entries can be re-signed for the new
+index URL; it never silently drops or invalidates signatures.
+
+For client testing, set `TWILIGHT_PLUGIN_INDEX_URL` to the production index URL.
+R2's global CDN route is separate from Cloudflare's mainland China network;
+measure downloads on the users' actual networks before promising mainland speeds.
+
+## Deploy to EdgeOne Makers
+
+在 EdgeOne Makers 控制台新建项目，选择 **导入 Git 仓库**，授权 GitHub 后导入
+`Px-asen/Twilight-Echo-plugins`。生产分支选择 `main`，开启自动部署，并使用以下设置：
+
+| 配置项 | 值 |
+| --- | --- |
+| 框架 | Other（其他 / 静态站点） |
+| 根目录 | `./` |
+| Node.js | `24.18.0` |
+| 安装命令 | `pnpm install --frozen-lockfile` |
+| 构建命令 | `pnpm run build:edgeone` |
+| 输出目录 | `dist` |
+
+仓库根目录的 [`edgeone.json`](edgeone.json) 使用[官方支持的配置格式](https://pages.edgeone.ai/document/edgeone-json)，
+已设置构建、安装、输出目录和 Node.js 版本，以及 `plugins.json` 的 60 秒浏览器缓存、
+`packages/*.tep` 的一年缓存与 `immutable`。发布新版插件时必须增加版本号并使用新的包文件名，避免旧缓存。
+EdgeOne 的[边缘缓存会在新部署后自动失效](https://pages.edgeone.ai/document/configuring-cache)。
+
+本地执行 `pnpm run build:edgeone` 会生成可直接部署的静态目录：
+
+```text
+dist/
+  index.html
+  plugins.json
+  packages/*.tep
+```
+
+构建原样复制已提交的索引及其引用的本地包，并验证包存在、SHA-256 一致及
+[25 MB 单文件限制](https://pages.edgeone.ai/document/limits-and-quotas)（保守按 25,000,000 字节检查，超限报错）。
+不会重新生成索引、打包、签名或运行 community discovery，也不会发布源码、scripts、catalog、
+`.github`、未被引用的历史包和本地预览包。外部 community/catalog 下载 URL 保持原样，不会被镜像。
+
+部署成功后，将下面的 `YOUR_DOMAIN` 替换为控制台显示的生产域名或绑定的自定义域名：
+
+```sh
+curl -i https://YOUR_DOMAIN/plugins.json
+curl -I https://YOUR_DOMAIN/packages/com.twilightecho.provider.bilibili-0.1.13.tep
+curl -fL https://YOUR_DOMAIN/packages/com.twilightecho.provider.bilibili-0.1.13.tep -o bilibili.tep
+```
+
+确认索引返回 HTTP 200 和 JSON，包返回 HTTP 200、上述缓存头且可下载；下载文件的 SHA-256
+应与索引中的 `checksumSha256` 一致（Windows 可用 `Get-FileHash ./bilibili.tep -Algorithm SHA256`）。
+包文件名以当前 `/plugins.json` 的 `sourceUrl` 为准。客户端索引地址设置为
+`https://YOUR_DOMAIN/plugins.json`，本地包会自动从同域名的 `/packages/` 下载。
+用于国内访问时，在控制台选择覆盖中国大陆的加速区域，并按平台要求绑定已备案的自定义域名。
 
 ## Use From Your Own Server
 
@@ -199,7 +343,7 @@ You can host the same files on any HTTPS server:
 ```text
 https://plugins.example.com/twilight/plugins.json
 https://plugins.example.com/twilight/packages/com.twilightecho.provider.bilibili-0.1.13.tep
-https://plugins.example.com/twilight/packages/com.twilightecho.provider.qqmusic-0.2.1.tep
+https://plugins.example.com/twilight/packages/com.twilightecho.provider.qqmusic-0.3.2.tep
 https://plugins.example.com/twilight/packages/com.twilightecho.provider.kugou-0.2.3.tep
 ```
 
@@ -235,3 +379,7 @@ Apache-2.0. See [LICENSE](LICENSE).
 ### Jellyfin 音源
 
 `com.twilightecho.provider.jellyfin`：通过服务器地址、用户名和密码登录，支持音乐搜索、全部音乐、歌单、封面和音频播放。需使用包含服务器登录表单的宿主构建，参见 [插件说明](plugins/jellyfin-provider/README.md)。
+
+### Navidrome 音源
+
+`com.twilightecho.provider.navidrome`：使用 Subsonic / OpenSubsonic API 连接 Navidrome 服务器，支持服务器登录、歌曲和专辑搜索、歌单读取、播放、封面和同步歌词。通过插件市场或本地 `.tep` 安装并启用，需 Twilight Echo 1.3.0 或更新版本。参见 [插件说明](plugins/navidrome-provider/README.md)。

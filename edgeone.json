@@ -1,0 +1,22 @@
+{
+  "buildCommand": "pnpm run build:edgeone",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "outputDirectory": "dist",
+  "nodeVersion": "24.18.0",
+  "headers": [
+    {
+      "source": "/plugins.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=60, must-revalidate" },
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" }
+      ]
+    },
+    {
+      "source": "/packages/*.tep",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
+        { "key": "Content-Type", "value": "application/octet-stream" }
+      ]
+    }
+  ]
+}

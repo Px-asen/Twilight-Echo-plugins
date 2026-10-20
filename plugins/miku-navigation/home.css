@@ -1,6 +1,6 @@
 html :is(.home .feature-card, .streaming-page .home-view .hero) {
   --miku-hero-size: 72%;
-  --miku-hero-x: 70%;
+  --miku-hero-x: 40%;
   --miku-hero-y: 12%;
   --miku-hero-opacity: 0.96;
   --miku-hero-mask: 22%;

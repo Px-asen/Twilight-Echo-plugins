@@ -301,8 +301,8 @@
               "variable": "--miku-hero-x",
               "type": "number",
               "defaults": {
-                "pureWhite": "70%",
-                "dark": "70%"
+                "pureWhite": "40%",
+                "dark": "40%"
               },
               "selector": ":is(.home .feature-card, .streaming-page .home-view .hero)",
               "unit": "%",

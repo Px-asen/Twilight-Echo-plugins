@@ -1,0 +1,241 @@
+.host-workspace-launcher > svg {
+  display: none;
+}
+/* The upstream portrait header has four tracks. The added host launcher
+   requires a fifth track so settings and transport keep their own slots. */
+.music-app.hosted-music[data-layout="portrait"] .music-topnav {
+  --song-cap: clamp(
+    0px,
+    calc(100vw - 320px - var(--song-transition-slot, 0px)),
+    280px
+  );
+  grid-template-columns: 28px 28px 104px 28px minmax(0, 1fr);
+}
+.music-app.hosted-music[data-layout="portrait"] .host-workspace-launcher > svg {
+  display: block;
+}
+@media (max-width: 359px) {
+  .music-app.hosted-music[data-layout="portrait"] .music-topnav {
+    grid-template-columns: 28px 28px 98px 28px minmax(0, 1fr);
+    gap: 4px;
+  }
+  .music-app.hosted-music[data-layout="portrait"] .theme-switch {
+    width: 98px;
+  }
+}
+.host-workspace {
+  color: var(--ink);
+  width: min(1050px, calc(100vw - 48px));
+  height: min(850px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  margin: auto;
+  padding: 32px;
+  overflow: hidden;
+}
+.host-workspace[open] {
+  display: flex;
+  flex-direction: column;
+}
+.host-workspace::backdrop {
+  background: rgba(4, 12, 19, 0.28);
+  backdrop-filter: blur(8px);
+}
+.host-workspace button {
+  background: transparent;
+  border: 0;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.host-workspace button:hover {
+  background: var(--line);
+}
+.host-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  border-block: 1px solid var(--line);
+  gap: 4px;
+}
+.host-tabs button {
+  font-size: 12px;
+  border-bottom: 2px solid transparent;
+}
+.host-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--ink);
+}
+.host-status {
+  font-size: 12px;
+  color: var(--accent);
+  min-height: 18px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.host-pages {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin;
+}
+.host-page[hidden],
+.host-workspace [hidden] {
+  display: none !important;
+}
+.host-workspace :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.host-workspace button:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.host-workspace button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.host-workspace summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-size: 13px;
+}
+.host-workspace input:not([type="checkbox"]),
+.host-workspace textarea {
+  min-width: 0;
+  max-width: 60%;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  padding: 8px;
+  border-radius: 0;
+  font: inherit;
+}
+.host-workspace textarea {
+  resize: vertical;
+  width: 60%;
+}
+.host-note {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.host-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: baseline;
+}
+.host-stats .host-note {
+  font-size: 24px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.host-activity {
+  display: flex;
+  gap: 5px;
+  height: 90px;
+  align-items: end;
+  padding: 12px 0;
+}
+.host-activity > div {
+  flex: 1;
+  background: var(--accent);
+  opacity: 0.7;
+  min-width: 0;
+}
+.host-workspace .settings-row {
+  min-height: 44px;
+  gap: 20px;
+}
+.host-workspace input[type="number"] {
+  width: 100px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 6px;
+}
+.host-workspace select {
+  max-width: 60%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 7px;
+}
+.host-track {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  gap: 8px;
+}
+.host-track-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.host-track small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.host-track.current {
+  border-left: 2px solid var(--accent);
+}
+.host-now {
+  font-size: 12px;
+  color: var(--muted);
+}
+.host-eq-band {
+  display: grid;
+  grid-template-columns: 30px repeat(4, minmax(0, 1fr));
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+}
+.host-eq-band .settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 4px;
+}
+.host-eq-band select {
+  max-width: 100%;
+}
+.host-lyrics {
+  text-align: center;
+}
+.host-lyrics > button {
+  display: block;
+  width: 100%;
+  color: var(--muted);
+  padding: 14px;
+  line-height: 1.8;
+}
+.host-lyrics > button.current {
+  color: var(--ink);
+  background: var(--line);
+}
+.host-lyrics p {
+  white-space: pre-wrap;
+}
+@media (max-width: 700px) {
+  .host-workspace {
+    padding: 20px;
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+    max-height: calc(100vh - 16px);
+  }
+  .host-eq-band {
+    grid-template-columns: 20px repeat(2, minmax(0, 1fr));
+  }
+  .host-eq-band input[type="number"] {
+    width: 75px;
+  }
+  .host-tabs {
+    gap: 0;
+  }
+  .host-tabs button {
+    padding: 8px;
+  }
+  .host-track {
+    gap: 0;
+  }
+  .host-track > button {
+    padding: 8px;
+  }
+}

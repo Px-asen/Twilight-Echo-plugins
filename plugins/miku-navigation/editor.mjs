@@ -11,7 +11,7 @@ export function createEditor(icons) {
   add('settings-wall-wash', '设置背景蒙版', '设置', '--miku-wall-wash', '53%', { selector: 'body:has(.app-shell) .settings-overlay-root--active', type: 'number', unit: '%', min: 0, max: 100 })
   const hero = ':is(.home .feature-card, .streaming-page .home-view .hero)'
   add('hero-image', '首页插画', '首页卡片', '--miku-hero-image', 'none', { type: 'image' })
-  for (const [id, label, value, max] of [['size', '插画大小', '72%', 200], ['x', '水平位置', '70%', 100], ['y', '垂直位置', '12%', 100], ['mask', '左侧淡化', '22%', 100]]) {
+  for (const [id, label, value, max] of [['size', '插画大小', '72%', 200], ['x', '水平位置', '40%', 100], ['y', '垂直位置', '12%', 100], ['mask', '左侧淡化', '22%', 100]]) {
     add(`hero-${id}`, label, '首页卡片', `--miku-hero-${id}`, value, { selector: hero, type: 'number', unit: '%', min: 0, max })
   }
   add('hero-opacity', '插画透明度', '首页卡片', '--miku-hero-opacity', '0.96', { selector: hero, type: 'number', min: 0, max: 1, step: 0.01 })

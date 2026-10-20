@@ -1,0 +1,119 @@
+# 本地音乐服务（macOS）
+
+`node scripts/music-server.mjs` 同时提供 `dist/` 界面和本地音乐 API。默认仅监听 `127.0.0.1:5173`；端口可通过 `--port 5174` 或 `PORT` 指定。修改前端后重新构建并刷新。服务保持运行期间可编辑本地流派规则，下一次读取曲库就会生效。
+
+```sh
+npm ci
+npm run build
+node scripts/music-server.mjs
+```
+
+## 数据与文件权限
+
+默认索引目录是仓库旁边的 `music-data-v3/`，可通过 `MUSIC_DATA_DIR` 覆盖。首次运行默认无音乐目录，请在“设置 → 音乐库设置 → 文件夹与扫描”中填写并保存自己的音乐文件夹。`MUSIC_ROOTS` 也能提供首次根目录，多个目录按系统路径分隔符分隔（macOS 为冒号）；已有 `config.json` 优先，更新程序不会更换已保存的音乐目录。
+
+- `config.json`：根目录、是否在扫描后补充在线资料、可选的本机 Beefweb 地址。
+- `library-index.json`：自动扫描缓存。记录真实文件的引用、尺寸/修改时间、元数据、封面与在线来源，不复制歌曲。
+- `genre-rules.json`：展示分类、别名和 `albumOverrides` 人工覆盖。扫描不修改这个文件。通过 API 更新时保留一份 `.backup`。
+- `artwork/`：从歌曲内嵌图片提取的原始封面缓存，不裁切或拉伸。文件夹封面直接读取原文件。
+- `qq-credits-cache.json`：QQ 搜索、曲目参与名单及来源冷却记录；不随源码分发。
+- `audio-cache-v040/`：FFmpeg 生成的 PCM 播放缓存与技术信息；DSF / DFF 只转换到此处，不改写源文件。
+- `native-v040/`：本机编译的 CoreAudio helper，不随源码分发。
+
+每个配置根目录下直属的音频文件各为一个单曲专辑，以歌曲 title（缺失时文件名）展示，ID 由该音频路径决定。子文件夹仍每个含音频的文件夹为一个专辑；扫描递归进入子文件夹，跳过符号链接和隐藏子目录。多张 CD 若在同一文件夹中，优先按 disc 标签、再按 `1-01` 这样的文件名前缀排序。不同子文件夹暂分别视为专辑。移动单曲文件或专辑文件夹会建立新 ID；当前版本尚未自动识别迁移。重扫时按专辑 ID 匹配缓存，旧根目录合辑由新单曲条目替换，不将旧合辑的介绍或分类自动分发。
+
+启动时先能读取缓存，随后后台扫描。未改动的音频不再解析标签。可读根目录内删除的专辑会移出当前列表；根目录断开或扫描访问失败保留原索引并标记离线。人工分类保留。子文件夹专辑优先 `cover`、`folder`、`front` 命名的 JPG/PNG/WebP，其次其他图片，最后使用第一份可用内嵌封面。根目录单曲优先各自音频的内嵌封面，其次与音频同名的图片，不共享根目录的任意封面。
+
+API 只能通过已索引的 ID 读取歌曲和封面，不能传入任意文件路径；文件读取再次检查实际位置仍在配置的根目录内。服务只绑定回环地址，并拒绝跨站 Origin、陌生 Host 和非 JSON 写入。勿在公网反向代理本服务。
+
+## API
+
+共享 JSON 类型见 `src/music-types.ts`。
+
+| 方法与路径 | 功能 |
+| --- | --- |
+| `GET /api/library` | 当前真实库、归并后的流派、根目录和扫描/补全状态；不虚构演示音乐 |
+| `POST /api/library/scan` | `{ "roots": ["/absolute/path"] }` 可选；保存目录并扫描，返回 202，轮询 GET 读取完成结果；并发请求合并 |
+| `GET /api/audio/:trackId` | 原始音频，支持单一 HTTP Range 与 HEAD，用于跳转播放 |
+| `GET /api/audio/capabilities` | 本机 FFmpeg / ffprobe、CoreAudio 能力、输出设备及失败原因 |
+| `POST /api/audio/prepare/:trackId` | 准备本地 PCM 缓存，返回播放 URL 与技术字段；不返回本机路径 |
+| `GET /api/decoded-audio/:trackId` | PCM 播放缓存，支持单段 Range 与 HEAD |
+| `GET /api/output/state`、`POST /api/output/command` | CoreAudio 状态，以及按索引 track ID 执行的白名单播放控制 |
+| `GET /api/artwork/:albumId` | 原比例封面图片；URL `v` 参数随封面变化更新 |
+| `GET/POST /api/genre-rules` | 获取或保存完整 `{version:1,genres:[{id,name,aliases:[]}],albumOverrides:{}}` |
+| `GET/POST /api/config` | 配置 `roots`、`onlineEnabled`、`musicBrainzContact`、`foobarBaseUrl`；响应还给出 `musicBrainzConfigured` |
+| `POST /api/library/enrich` | 明确请求 MusicBrainz 补全；可选 `{ "albumIds": ["album-..."] }`；返回 202 |
+| `POST /api/library/introductions` | 独立查询/更新百科专辑介绍，无需 MusicBrainz 配置；`{ "albumIds": ["album-..."], "force": true }` 均可省略；返回 202 |
+| `POST /api/library/credits` | 手动查询 QQ 音乐制作人员；可选 `{ "albumIds": ["album-..."], "force": false }`；返回 202，进度见 `library.credits`。不传专辑 ID 时查询配置曲库中缺失或过期的制作资料，无需账号或 MusicBrainz 配置 |
+| `GET /api/foobar/status` | 是否保存过本机桥接地址；不是实际连接成功证明 |
+| `GET/POST /api/foobar/*` | 原样代理到本机 Beefweb `/api/*`，例如 `GET /api/foobar/player` |
+
+默认规则可将 `Mandopop`、`国语流行音乐`、`华语流行音乐` 归入“华语流行”。人工 `albumOverrides` 优先，其次对原始流派应用别名。未归并的来源分类保留原名；无信息归入“未分类”。原始标签完整保留，不反写音乐文件。
+
+## 音频能力
+
+本地读取 FLAC、WAV、M4A、DSF、DFF 等元数据。M4A 是容器，界面应同时展示 codec，不能把所有 M4A 标为无损 ALAC。`lossless` 反映解析器辨认出的无损/有损编码。位深、采样率、码率按解析结果显示，缺失时显示未知；AAC 的位深是解码输出位深，不代表原始无损精度。`localNote` 单独保存本地 comment；它绝不映射到专辑介绍 `description`。
+
+DSF / DFF 在索引中仍为 `browserPlayable: false`，表示浏览器不能直接播放原始 DSD；`localDecodable` 与 `decodedAudioUrl` 提供本机准备后的播放路径。普通解码将 DSD 转为 24 位 / 176.4 kHz PCM，保留声道数；CoreAudio 无缝预备的下一首另行归一为当前引擎采样率的 Float32 PCM，按真实 WAV 帧数接续。原始歌曲及标签只读，曲库的源格式仍显示 DSD。没有 Native DSD 或 DoP 输出；Beefweb 代理继续保留为历史实验接口。
+
+`POST /api/audio/prepare/:trackId` 对 DSD 返回 `conversion: "dsd-to-pcm"`、`sourceSampleRate`（DSD 一位采样时钟）、`sourceBitsPerSample: 1`；`sampleRate`、`bitsPerSample` 和 `duration` 描述实际 PCM 缓存。按真实 codec 决定转换，不依赖文件后缀。首次完整解码后开始播放，后续命中缓存；单个 PCM 文件上限 2 GiB，磁盘缓存回收目标 4 GiB；当前与下一首持有租约，受保护文件或并行解码可能使占用暂时超过目标。缺失 FFmpeg / ffprobe 时明确提示；其他格式可尝试浏览器自身的解码能力。详细输出边界见 [音频说明](AUDIO-V0.4.0.md)。
+
+氛围配乐与歌曲分别使用独立音量。`MusicPlayer` 构造参数 `bgmVolume` 默认为 `0.18`，`setBgmVolume(0…1)` 和 `setBgmEnabled` 控制配乐，`setVolume` 仅控制歌曲。播放歌曲前配乐约 220ms 淡出至静音；停止歌曲回到浏览时按配乐自身音量约 650ms 淡入。暂停歌曲保持安静，歌曲连续播放之间不插入配乐。BGM 文件 `/audio/atmosphere.ogg` 由本地服务以 `audio/ogg` 提供。
+
+自 V0.3.0 起，`songFadeEnabled` 默认 `true`，界面偏好中的已有选择仍优先。开启时切歌先以约 450ms 淡出正在播放的曲目，再切换音源并以约 450ms 淡入；不混播两首歌曲。关闭后恢复直接切歌。曲目操作代次负责使被新选择、暂停或停止打断的旧异步请求失效，歌曲淡变与 BGM 淡变分别管理。
+
+## 本地制作信息与 QQ 音乐查询（V0.3.1）
+
+仅「02 专辑介绍」下方的制作人员区提供单张专辑查询，“设置 → 音乐库设置 → 制作信息”提供查询缺失资料的批量入口。数据通过本地 Node 服务请求 QQ 音乐的搜索与 `music.sociality.KolWorksTag / SongProducer` 接口；只发送必要的歌名、歌手及公开歌曲标识，音频、文件路径和本地备注不发送。按曲目真实标签匹配歌曲，不能把根目录单曲的显示专辑标题当作真实专辑名。无法确认歌名、艺人、版别或时长时不猜测人员。
+
+`producers` 沿用现有字段名，记录 `name/role/source/trackId/trackTitle/url`，语义扩展为制作、创作和演奏人员。QQ 信息的 `source` 为 `QQ Music`；本地标签为 `local`，既有 MusicBrainz 资料仍保留。界面只在「02 专辑介绍」显示名单，按姓名与来源合并，姓名、职责、来源左对齐。姓名 14px、职责 12px、来源 10.5px 灰色小字；单曲直接标注歌名，多曲展开查看每曲职责及来源链接，不提升为整张专辑职务。
+
+`creditsLookup` 保存每张专辑的查询时间、状态、匹配曲数和错误；`library.credits` 返回批量完成数量及当前曲目进度。失败和部分结果保留已有有效名单，扫描期间迟到结果必须重新核对曲目身份。成功数据保存在本机数据目录，普通批量查询优先复用缓存；单张「重新查询」可刷新，但不能跳过来源冷却。限流或连续失败会暂停队列，不阻止本地播放。
+
+本地元数据解析版本已提升，会在下一次扫描重读旧缓存，补取作曲、作词、编曲、指挥、制作、混音及明确的原生参与者标签。只读取标签已有事实，不从歌词或任意注释猜测人员。查询的第三方资料缓存不随源码分发。`npm run check:credits` 使用隔离 fixture 验证本地标签、匹配、缓存、限流及服务集成。
+
+QQ 来源属于未承诺稳定性的公开可访问接口。2026-10-01 公开样本《晴天》曾取得 10 项人员角色，浏览器端到端联调也出现过搜索业务码 `2001`；HTTP 200 不等于业务查询成功。默认请求串行、间隔至少 1.5 秒，普通成功缓存 30 天；HTTP 429 尊重 `Retry-After`，没有该头时冷却 15 分钟。错误不自动重试、不换出口；本地缓存不能消除首次联网查询的可用性限制。
+
+## 可选 MusicBrainz
+
+入口位于“设置 → 音乐库设置 → 分类与资料来源”中的“MusicBrainz 资料补全”，默认收起。展开后可手动补全、设置联系信息，以及开启或关闭扫描后的自动补全；同一分组提供本地流派归并规则入口。界面整理不改变已有自动补全偏好、缓存或资料来源。
+
+在线查询只上传专辑文字信息/已有 MBID，不上传音频。默认关闭自动补全。开启前需在上述资料补全区域填写自己的维护者联系邮箱或项目网址（通过 `POST /api/config {"musicBrainzContact":"自己的邮箱或项目网址"}` 保存），也可使用环境变量：
+
+```sh
+MUSICBRAINZ_CONTACT='your-project-contact' node scripts/music-server.mjs
+```
+
+通过显式补全按钮查询一次；或保存 `onlineEnabled:true`，以后扫描完成后自动查询未查过的专辑。已有 Release MBID 精确查找，否则比较标题、艺术家、年份和曲目数，并要求唯一的高匹配结果。不确定时保留本地资料，绝不猜制作人。所有外网请求间隔至少 1.1 秒。断网、限流和缺配置只影响补全，不阻止本地曲库显示与播放。
+
+通过 MusicBrainz 补全时，专辑介绍只在高置信匹配后，跟随 release-group 关联的 Wikidata/Wikipedia 链接获取百科导言。优先中文，其次英文；该流程不进行仅按标题的百科搜索，不把 MusicBrainz 编辑注释当介绍。`descriptionSource` 保存来源名称、链接、更新时间与许可说明。没有关联、存在消歧义或网络失败时保留空介绍并提供状态；原有缓存不被无结果覆盖。“设置 → 音乐库设置 → 专辑介绍”中的独立百科查询流程见下文。
+
+制作人来源和角色保留，录音级制作人附参与曲目。流派来自 release/release-group 的 `genres`，不把任意 `tags` 当成流派。MusicBrainz 核心数据与补充数据分别受 CC0 和 CC BY-NC-SA 3.0 约束；保存来源时保留相应许可。公开发布的是播放器代码，个人曲库及在线资料缓存不随仓库和 ZIP 分发，不将这些数据统一重授 MIT；详见 [NOTICE](../NOTICE.md)。
+
+参考：[MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API)、[速率与 User-Agent](https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting)、[数据库许可](https://musicbrainz.org/doc/MusicBrainz_Database)、[Wikidata 访问](https://www.wikidata.org/wiki/Help:Data_access)、[百科导言 API](https://www.mediawiki.org/wiki/Extension:TextExtracts)、[music-metadata](https://github.com/Borewit/music-metadata)。
+
+## 一键查询/更新专辑介绍
+
+入口位于“设置 → 音乐库设置 → 专辑介绍”中的“公开百科查询”，按需展开。
+
+独立的 `scripts/album-introductions.mjs` 使用 Wikipedia 与 Wikidata 公开读取 API，不依赖 MusicBrainz contact 表单或 API Key；如果用户已填写真实联系方式，沿用该信息标识客户端，否则使用明确的本应用 User-Agent。查询只发送专辑名/歌手及公开百科实体 ID，年份在本地比对；不发送文件路径、音频、曲目清单或本地 comment。
+
+先按专辑标题及括号内中英文别名查找正式百科条目，并应用 OpenCC 繁简归一化和引号/标点归一化。缺失时通过 Wikipedia 搜索 API 发现候选，搜索片段不作为介绍。候选必须是专辑作品，名称、歌手及发行年份相符；优先核对 Wikidata 的 performer/publication date，结构资料缺失时仅接受正式百科首段中可核对的对应信息。已有结构字段冲突（例如本地为再版年份）时保留候选待核实。同名的歌曲、歌手页面、消歧义页面或多个相符候选不会自动采用。
+
+`description` 来自正式页面的纯文本导言，`descriptionSource` 保留出处、链接、查询时间和来源许可。它是有出处的百科摘要，不宣称所有维基条目均已被权威核实。缺少来源、空导言和不确定匹配保持未匹配状态；网络超时、API 错误与限流明确标记失败，不能等同“没有资料”。原有介绍不会被失败或空结果覆盖。
+
+`GET /api/library` 的 `introductions` 返回 `running/completed/total/updated/notFound/failed/currentAlbum/error`。其中 `notFound` 包含无法确认和无可用介绍的专辑。每张专辑的 `introduction.status` 区分 `matched/not-found/uncertain/error`，可显示具体原因。请求串行，间隔至少 1.1 秒，每次最多等待 8 秒；连续 3 张均遇到来源访问错误时停止剩余任务，保留剩余数量供重试。
+
+默认复用已有介绍与最近 7 天的未匹配结果；`force:true` 强制重新查询，但依旧保留可用旧文本直到获取新的可靠结果。失败可重试，批量请求自动合并，进度与界面/三维动画解耦。介绍与匹配状态缓存在 `library-index.json`，重启与扫描保留。
+
+线上资料覆盖率和访问成功率不由本地回归保证；网络失败不会标成没有资料，本地浏览与播放不依赖查询成功。
+
+## 开发检查说明
+
+以下说明检查脚本的用途；当前候选的执行结果和覆盖范围见 [验证记录](REVIEW-V0.5.0.md)。
+
+`node --test scripts/check-music-library.mjs` 使用临时合成 WAV 和元数据 fixture，验证实际 WAV 解析、字节范围、增删与断盘保留、缓存、封面优先、人工覆盖、并发扫描和含糊匹配。测试不会读取或改写用户歌曲。
+
+`node --experimental-strip-types --test scripts/check-music-player.mjs` 使用受控 Audio 和可推进时钟，验证两路独立音量、过渡静音门、快速开关与音量变化、恢复和迟到播放 Promise 的取消。测试不播放真实声音、不启动服务。
+
+`node --test scripts/check-album-introductions.mjs` 仅使用人工 fixture 与网络替身，验证繁简/双语标题、错误身份/年份/作品类型的拒绝、来源归属、搜索片段隔离、全来源失败、空导言、并发与缓存、三次失败暂停和扫描期间保留介绍。`check-music-library` 另验证实际 HTTP 更新路由及无 MusicBrainz 配置也可调用，响应内容仍来自替身，不联网查询用户专辑。

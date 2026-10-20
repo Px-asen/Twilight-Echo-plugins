@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "owners": {
+    "com.github.iris-sci.playlist-bridge": "https://github.com/IRIS-SCI/twilight-playlist-bridge",
+    "com.twilightecho.tool.wallpaper-engine": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine"
+  },
+  "history": {
+    "com.github.iris-sci.playlist-bridge": {
+      "version": "2.0.1",
+      "checksumSha256": "1e0093715eba4565ebea4f35189e9f05a8fa8b72c5c03612397b626c9adc2cff"
+    },
+    "com.twilightecho.tool.wallpaper-engine": {
+      "version": "2.1.1",
+      "checksumSha256": "4bf10f1994c3eb2fab368fc4d4e85b325f6e3800fefd0bbf7cb222f5530286cd"
+    }
+  },
+  "plugins": [
+    {
+      "id": "com.github.iris-sci.playlist-bridge",
+      "version": "2.0.1",
+      "repository": "https://github.com/IRIS-SCI/twilight-playlist-bridge",
+      "sourceUrl": "https://github.com/IRIS-SCI/twilight-playlist-bridge/releases/download/v2.0.1/com.github.iris-sci.playlist-bridge-2.0.1.tep",
+      "checksumSha256": "1e0093715eba4565ebea4f35189e9f05a8fa8b72c5c03612397b626c9adc2cff",
+      "tags": [
+        "ui",
+        "foobar2000",
+        "m3u8",
+        "playlist",
+        "twilight-echo",
+        "community"
+      ]
+    },
+    {
+      "id": "com.twilightecho.tool.wallpaper-engine",
+      "version": "2.1.1",
+      "repository": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine",
+      "sourceUrl": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine/releases/download/v2.1.1/com.twilightecho.tool.wallpaper-engine-2.1.1.tep",
+      "checksumSha256": "4bf10f1994c3eb2fab368fc4d4e85b325f6e3800fefd0bbf7cb222f5530286cd",
+      "tags": [
+        "tool",
+        "ui",
+        "community"
+      ]
+    }
+  ]
+}

@@ -2,7 +2,10 @@ const { createHash } = require('node:crypto')
 const fs = require('node:fs/promises')
 const path = require('node:path')
 
-const DEFAULT_TWILIGHT_ROOT = path.resolve(__dirname, '..', '..', 'Twilight_Echo-main')
+const { existsSync } = require('node:fs')
+const DEFAULT_TWILIGHT_ROOT = ['Twilight_Echo', 'Twilight_Echo-main']
+  .map(name => path.resolve(__dirname, '..', '..', name))
+  .find(root => existsSync(path.join(root, 'packages/create-twilight-plugin/lib/zip.cjs')))
 
 function readArg(name) {
   const index = process.argv.indexOf(name)
@@ -37,6 +40,9 @@ async function main() {
   const stagingDir = path.join(repoRoot, '.cache', `${manifest.id}-${manifest.version}`)
   const packagePath = path.join(packagesDir, packageName)
 
+  const stagingRelative = path.relative(path.join(repoRoot, '.cache'), stagingDir)
+  if (!stagingRelative || stagingRelative.startsWith('..') || path.isAbsolute(stagingRelative))
+    throw new Error('Invalid package staging directory')
   await fs.rm(stagingDir, { recursive: true, force: true })
   await fs.mkdir(stagingDir, { recursive: true })
   await fs.copyFile(manifestPath, path.join(stagingDir, 'plugin.json'))
@@ -113,7 +119,12 @@ async function main() {
     if (error?.code !== 'ENOENT') throw error
   }
 
-  await createZip(stagingDir, packagePath)
+  for (const experience of rawManifest.contributes?.experiences ?? []) {
+    await fs.access(path.join(stagingDir, experience.entry))
+  }
+  await createZip(stagingDir, packagePath, {
+    includeDist: (rawManifest.contributes?.experiences ?? []).some(experience => experience.entry.startsWith('dist/'))
+  })
   await fs.rm(stagingDir, { recursive: true, force: true })
 
   const buffer = await fs.readFile(packagePath)

@@ -1,0 +1,21 @@
+{
+  "primary": {
+    "repository": "https://github.com/RonaldDeng/Rhine-Music-Demo",
+    "commit": "a889801f7f99993ee23b40e97efdeac6ad04a9be",
+    "version": "0.5.0"
+  },
+  "supplementary": {
+    "repository": "https://github.com/LBEILC/RhineLabUI",
+    "commit": "12cc5e4013acb9408f753ff71de6b8492299b7c8",
+    "status": "original opening integrated into loading; project wording adapted; music shelf remains primary reference",
+    "files": [
+      "src/loading-opening/boot.ts",
+      "src/loading-opening/boot-motion.ts",
+      "src/loading-opening/boot-tracks.ts",
+      "src/loading-opening/boot-logo-tracks.ts",
+      "src/loading-opening/boot-orbit-tracks.ts",
+      "src/loading-opening/brand.ts"
+    ]
+  },
+  "adapterVersion": "0.2.3"
+}

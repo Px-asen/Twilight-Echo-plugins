@@ -108,8 +108,11 @@ function mqttPacket(type, body) {
   return Buffer.concat([Buffer.from([type]), mqttVarInt(body.length), body])
 }
 
-function mqttConnack(reasonCode = 0) {
-  return mqttPacket(0x20, Buffer.from([0, reasonCode, 0]))
+function mqttConnack(reasonCode = 0, serverReference = '') {
+  const properties = serverReference
+    ? Buffer.concat([Buffer.from([0x1c]), mqttText(serverReference)])
+    : Buffer.alloc(0)
+  return mqttPacket(0x20, Buffer.concat([Buffer.from([0, reasonCode, properties.length]), properties]))
 }
 
 function mqttSuback(reasonCode = 0) {
@@ -132,7 +135,11 @@ class FakeMqttWebSocket {
   static instances = []
 
   constructor(url, protocol) {
-    assert.equal(url, 'wss://mu.y.qq.com/ws/handshake')
+    assert.equal(
+      url,
+      FakeMqttWebSocket.plan.urls?.[FakeMqttWebSocket.instances.length] ||
+        'wss://mu.y.qq.com/ws/handshake'
+    )
     assert.equal(protocol, 'mqtt')
     this.listeners = new Map()
     this.closed = false
@@ -161,7 +168,14 @@ class FakeMqttWebSocket {
     const type = packet[0] >> 4
     if (type === 1) {
       queueMicrotask(() =>
-        this.emit('message', { data: mqttConnack(FakeMqttWebSocket.plan.connackCode || 0) })
+        this.emit('message', {
+          data: mqttConnack(
+            FakeMqttWebSocket.plan.connackCodes?.[FakeMqttWebSocket.instances.indexOf(this)] ??
+              FakeMqttWebSocket.plan.connackCode ??
+              0,
+            FakeMqttWebSocket.plan.serverReference
+          )
+        })
       )
       return
     }
@@ -945,6 +959,31 @@ test('reports native QR connection failures before a user scans', async () => {
     await withFetch(nativeQrFetch('rejected-qr', png), async () => {
       await assert.rejects(() => harness.provider.current.getQrLogin(), /二维码登录初始化失败/)
       assert.equal(JSON.stringify(harness.logs).includes('rejected-qr'), false)
+    })
+  })
+})
+
+test('follows the QQ MQTT broker redirect on the handshake path', async () => {
+  const harness = await startPlugin({
+    disclaimer: { disclaimerVersion: CONSENT_VERSION },
+    'native-device': nativeDevice()
+  })
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  resetFakeMqtt({
+    urls: [
+      'wss://mu.y.qq.com/ws/handshake',
+      'wss://mu.y.qq.com/ws/handshake/11.168.56.187:29001'
+    ],
+    connackCodes: [0x9d, 0],
+    serverReference: '11.168.56.187:29001'
+  })
+  await withWebSocket(FakeMqttWebSocket, async () => {
+    await withFetch(nativeQrFetch('redirect-qr', png), async () => {
+      const qr = await harness.provider.current.getQrLogin()
+      assert.match(qr.imageDataUrl, /^data:image\/png;base64,/)
+      assert.equal((await harness.provider.current.checkQrLogin(qr.key)).code, 66)
+      assert.equal(FakeMqttWebSocket.instances.length, 2)
+      assert.equal(FakeMqttWebSocket.instances[0].closed, true)
     })
   })
 })

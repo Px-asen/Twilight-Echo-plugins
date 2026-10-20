@@ -1,0 +1,17 @@
+{
+  "id": "com.twilightecho.provider.navidrome",
+  "name": "Navidrome 音源",
+  "version": "1.0.0",
+  "description": "连接 Navidrome 音乐服务器，提供搜索、播放、封面、歌词和歌单功能。",
+  "author": "Px-asen",
+  "license": "Apache-2.0",
+  "type": ["provider"],
+  "main": "index.mjs",
+  "engines": {
+    "twilightEcho": ">=1.3.0"
+  },
+  "apiVersion": 1,
+  "permissions": ["network", "settings", "library:read"],
+  "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
+  "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins/tree/main/plugins/navidrome-provider"
+}

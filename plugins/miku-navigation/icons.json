@@ -69,63 +69,63 @@
     "group": "settings",
     "label": "常规",
     "file": "settings/01_general.png",
-    "selector": ".settings-preview-nav > .preview-nav-item > .pi-sliders-h",
+    "selector": ".settings-preview-nav .preview-nav-item > .pi-sliders-h",
     "legacyGlyph": true
   },
   {
     "group": "settings",
     "label": "播放",
     "file": "settings/02_playback.png",
-    "selector": ".settings-preview-nav > .preview-nav-item > .pi-volume-up",
+    "selector": ".settings-preview-nav .preview-nav-item > .pi-volume-up",
     "legacyGlyph": true
   },
   {
     "group": "settings",
     "label": "DSP",
     "file": "settings/03_dsp.png",
-    "selector": ".settings-preview-nav > .preview-nav-item > .pi-sliders-v",
+    "selector": ".settings-preview-nav .preview-nav-item > .pi-sliders-v",
     "legacyGlyph": true
   },
   {
     "group": "settings",
     "label": "缓存",
     "file": "settings/04_cache.png",
-    "selector": ".settings-preview-nav > .preview-nav-item > .pi-database",
+    "selector": ".settings-preview-nav .preview-nav-item > .pi-database",
     "legacyGlyph": true
   },
   {
     "group": "settings",
     "label": "性能",
     "file": "settings/05_performance.png",
-    "selector": ".settings-preview-nav > .preview-nav-item > .pi-bolt",
+    "selector": ".settings-preview-nav .preview-nav-item > .pi-bolt",
     "legacyGlyph": true
   },
   {
     "group": "settings",
     "label": "外观",
     "file": "settings/06_appearance.png",
-    "selector": ".settings-preview-nav > .preview-nav-item > .pi-palette",
+    "selector": ".settings-preview-nav .preview-nav-item > .pi-palette",
     "legacyGlyph": true
   },
   {
     "group": "settings",
     "label": "桌面歌词",
     "file": "settings/07_desktop_lyrics.png",
-    "selector": ".settings-preview-nav > .preview-nav-item > .pi-window-maximize",
+    "selector": ".settings-preview-nav .preview-nav-item > :is(.pi-window-maximize, .pi-align-left)",
     "legacyGlyph": true
   },
   {
     "group": "settings",
     "label": "快捷键",
     "file": "settings/08_shortcuts.png",
-    "selector": ".settings-preview-nav > .preview-nav-item > .pi-key",
+    "selector": ".settings-preview-nav .preview-nav-item > :is(.pi-key, .pi-link)",
     "legacyGlyph": true
   },
   {
     "group": "settings",
     "label": "关于",
     "file": "settings/09_about.png",
-    "selector": ".settings-preview-nav > .preview-nav-item > .pi-info-circle",
+    "selector": ".settings-preview-nav .preview-nav-item > :is(.pi-info-circle, .pi-cog)",
     "legacyGlyph": true
   },
   {
