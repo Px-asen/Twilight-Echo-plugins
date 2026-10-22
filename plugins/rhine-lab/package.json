@@ -1,13 +1,13 @@
 {
   "name": "twilight-rhine-music",
-  "version": "0.2.9",
+  "version": "0.2.14",
   "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
     "predev": "node scripts/export-records.mjs",
     "dev": "vite --host 127.0.0.1",
-    "prebuild": "node scripts/export-records.mjs",
+    "prebuild": "node scripts/export-records.mjs && npm run cook:render",
     "check:content": "node --experimental-strip-types --test scripts/check-content.mjs",
     "check:viewport": "node --experimental-strip-types scripts/check-viewport.mjs",
     "export:archives": "node scripts/export-records.mjs",
@@ -37,7 +37,12 @@
     "check:interface-audio": "node --test scripts/check-interface-audio.mjs",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "dev:host": "vite --host 127.0.0.1 --port 5321 --strictPort",
-    "check:lyrics": "node --experimental-strip-types --test tests/lyrics.test.mjs && node scripts/check-lyrics-page.mjs"
+    "check:lyrics": "node --experimental-strip-types --test tests/lyrics.test.mjs && node scripts/check-lyrics-page.mjs",
+    "check:performance": "node --experimental-strip-types --test tests/render-performance.test.mjs && node scripts/check-frame-budget.mjs",
+    "cook:render": "node scripts/cook-render-assets.mjs",
+    "check:render-tiers": "node scripts/check-render-tiers.mjs",
+    "check:gpu-cost": "node scripts/check-gpu-cost.mjs",
+    "check:memory-aa": "node scripts/check-render-memory-aa.mjs"
   },
   "dependencies": {
     "@kitlangton/rolling-number": "0.4.1",
@@ -49,6 +54,7 @@
   "devDependencies": {
     "@types/three": "^0.183.0",
     "prettier": "^3.9.6",
+    "sharp": "0.35.5",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   },

@@ -3,6 +3,7 @@ import { COVER_SIZE, COVER_PAINT_SIZE, paintCover } from "./cover-atlas";
 import type { MusicAlbum } from "./music-types";
 import { createAlbumPrintMaterial } from "./music-model.ts";
 import { getAlbumCoverUrl } from "./music-cover-display.ts";
+import { cookedTextureSource } from "./cooked-textures.ts";
 
 /** A viewer owns its own print and texture, independent of the array's selection. */
 export class ViewerAlbumCover {
@@ -47,17 +48,22 @@ export class ViewerAlbumCover {
     const image = new Image();
     this.image = image;
     image.crossOrigin = "anonymous";
-    image.src = url;
+    let cooked = cookedTextureSource(url, COVER_PAINT_SIZE);
+    image.src = cooked.url;
     try {
-      await image.decode();
+      try { await image.decode(); }
+      catch {
+        if (cooked.url === url || this.disposed) throw new Error("Cover unavailable");
+        cooked = { url }; image.src = url; await image.decode();
+      }
       if (this.disposed || this.mesh.userData.coverDisposed) return;
       paintCover(this.canvas, this.album, {
-        source: image, width: image.naturalWidth, height: image.naturalHeight,
+        source: image, width: cooked.width ?? image.naturalWidth, height: cooked.height ?? image.naturalHeight,
       });
       this.mesh.userData.coverStatus = "loaded";
       this.mesh.userData.coverImageSize = [
-        image.naturalWidth,
-        image.naturalHeight,
+        cooked.width ?? image.naturalWidth,
+        cooked.height ?? image.naturalHeight,
       ];
       this.texture.needsUpdate = true;
     } catch {

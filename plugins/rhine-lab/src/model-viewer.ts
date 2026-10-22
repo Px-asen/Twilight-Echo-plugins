@@ -111,6 +111,8 @@ export class ModelViewer {
     parent.appendChild(this.root);
     this.canvasHost = this.root.querySelector(".viewer-canvas")!;
     this.renderer = new THREE.WebGLRenderer({
+      // The no-postprocessing viewer draws geometry directly to this canvas.
+      // Keep its original MSAA; the main composer does not use this context.
       antialias: true,
       powerPreference: "high-performance",
     });
@@ -582,6 +584,7 @@ export class ModelViewer {
     this.appliedQuality = key;
     this.quality = normalizeQuality(quality);
     this.pipeline.smaa.enabled = this.quality.antialias === "smaa";
+    this.pipeline.fxaa.enabled = this.quality.antialias === "fxaa";
     applyTextureQuality(this.scene, this.renderer, this.quality);
     this.resize();
   }
@@ -650,7 +653,7 @@ export class ModelViewer {
     fog.near = Math.max(0, objectDistance - 1);
     fog.far = objectDistance + 12;
     if (this.theme) this.themeAppearance.update(this.camera);
-    if (this.quality.antialias === "smaa") this.pipeline.composer.render();
+    if (this.quality.antialias !== "off") this.pipeline.composer.render();
     else this.renderer.render(this.scene, this.camera);
     this.root.dataset.stats = JSON.stringify({
       ready: Boolean(this.source),

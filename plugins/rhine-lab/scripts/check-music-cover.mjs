@@ -221,14 +221,14 @@ try {
   };
   const versionBefore = cold.array.material.map.version;
   for (let slot = 0; slot < 100; slot++) cold.setSlot(slot, record(`cold-${slot}`));
-  assert.deepEqual([cold.getStats().atlasWidth, cold.getStats().atlasHeight, cold.getStats().atlasBytes], [6144, 6656, 156 * 1024 ** 2]);
+  assert.deepEqual([cold.getStats().atlasWidth, cold.getStats().atlasHeight, cold.getStats().atlasBytes], [6144, 2048, 48 * 1024 ** 2]);
   assert.equal(cold.getStats().activeDecodes, 3);
   assert.equal(cold.getStats().queuedDecodes, 97);
   assert.equal((await cold.prepareVisible(0)).settled, false, "prewarm has a bounded deadline when sources have not decoded");
   assert.equal(cold.array.geometry.attributes.coverReady.getX(0), 0);
   assert.equal(cold.flushUploads(renderer), 8);
-  assert.deepEqual(allocations, [{ ready: false, version: versionBefore }], "initial GPU storage is allocated without uploading the 156 MiB canvas");
-  assert.deepEqual(copies[0].position, [0, 6400], "top canvas row maps to the top WebGL tile");
+  assert.deepEqual(allocations, [{ ready: false, version: versionBefore }], "initial GPU storage is allocated without uploading the full canvas");
+  assert.deepEqual(copies[0].position, [0, 1792], "top canvas row maps to the top WebGL tile");
   assert.equal(copies.length, 1, "adjacent tiles share one upload");
   assert.equal(copies[0].width, 2048, "one batch contains eight 256px tiles");
   assert.equal(cold.array.geometry.attributes.coverReady.getX(7), 1);
@@ -278,7 +278,7 @@ try {
   cold.setSlot(poolSize - 1, record("after-reset"));
   pending.get("cover-after-reset").resolve(); await flush();
   cold.flushUploads(renderer);
-  assert.deepEqual(copies.at(-1).position, [0, 6400], "reset starts a fresh resident tile assignment independently of the instance ID");
+  assert.deepEqual(copies.at(-1).position, [0, cold.getStats().atlasHeight - 256], "reset starts a fresh resident tile assignment independently of the instance ID");
   assert.equal(copies.at(-1).token, "cover-after-reset");
   const pendingAtDisposal = cold.select(record("dispose-active"));
   for (let slot = 0; slot < 8; slot++) cold.setSlot(slot, record(`dispose-queued-${slot}`));
@@ -346,6 +346,21 @@ try {
   assert.equal(requests.at(-1).url, first.album.coverUrl, "same record restores its original after another reset");
   requests.at(-1).resolve(art(first.album.coverUrl)); await restoredSelection;
   display.dispose(); returned.material.map.dispose(); returned.material.dispose();
+  const grow = new CoverAtlas(poolSize, 8192, 16);
+  grow.loadImage = async () => undefined;
+  for(let slot=0;slot<210;slot++)grow.setSlot(slot,record(`grow-${slot}`));
+  assert.equal(grow.getStats().atlasCapacity,384,"unique visible prints expand storage on demand");
+  assert.equal(grow.slotTiles[0],0,"growth keeps canonical slot ownership");
+  const tileUV=grow.array.geometry.attributes.coverTile;
+  for(let slot=0;slot<210;slot++) {
+    assert.ok(tileUV.getX(slot)>=0&&tileUV.getY(slot)>=0);
+    assert.ok(tileUV.getX(slot)+tileUV.getZ(slot)<=1.00001&&tileUV.getY(slot)+tileUV.getW(slot)<=1.00001);
+  }
+  for(let i=0;i<1000;i++)grow.setSlot(0,record(`recycled-${i}`));
+  assert.equal(grow.getStats().atlasCapacity,384,"invisible cached prints are recycled before storage grows");
+  grow.reset();
+  assert.equal(grow.getStats().atlasBytes,48*1024**2,"library reset releases expanded storage");
+  grow.dispose();
   atlas.dispose();
   snapshot.material.map.dispose(); snapshot.material.dispose();
   console.log("V0.4.3 cover pipeline passed: approved B missing/failed covers, direct 800px selection/viewer sources, bounded 24-source generation cache, DOM original/fallback handling, all aspect ratios, shared UV/painter, half-texel guards, 3-source cold-start bound, priority selection, 16 MiB decode cap, 8-tile/2 MiB partial uploads, no stale recycled art, bounded prewarm, reset/dispose races and independent snapshots.");

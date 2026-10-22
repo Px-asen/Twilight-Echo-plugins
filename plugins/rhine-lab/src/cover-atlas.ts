@@ -5,6 +5,7 @@ import type { MusicSelectionLighting } from "./music-lighting";
 import type { ArchiveRecord } from "./data";
 import { trackAtlasUnpack, type AtlasUnpackState } from "./atlas-upload-state.ts";
 import { MUSIC_COVER, createAlbumPrintMaterial } from "./music-model.ts";
+import { cookedTextureSource } from "./cooked-textures.ts";
 
 // Paper insert inside the thin lid, shared by shelf, selection and viewer.
 export const COVER_SIZE = MUSIC_COVER;
@@ -243,7 +244,8 @@ export class CoverAtlas {
   private generation = 0;
   private disposed = false;
   private readonly columns: number;
-  private readonly rows: number;
+  private rows: number;
+  private readonly maxRows: number;
   private readonly tileWidth: number;
   private readonly tileHeight: number;
 
@@ -251,11 +253,14 @@ export class CoverAtlas {
     // Keep the enlarged 612-slot shelf below an 8192px texture edge at the
     // existing 256px cover resolution; preserve smaller pools' original grid.
     this.columns = count > 512 ? 24 : 16;
-    this.rows = Math.ceil(count / this.columns);
+    this.maxRows = Math.ceil(count / this.columns);
+    // Reserve only a small working set. Repeated albums share physical tiles;
+    // a large library does not imply that all 612 shelf slots need unique art.
+    this.rows = Math.min(8, this.maxRows);
     this.tileWidth = Math.min(
       256,
       Math.floor(maxTextureSize / this.columns),
-      Math.floor(maxTextureSize / this.rows),
+      Math.floor(maxTextureSize / this.maxRows),
     );
     this.tileHeight = this.tileWidth;
     this.atlasCanvas.width = this.columns * this.tileWidth;
@@ -274,7 +279,7 @@ export class CoverAtlas {
     this.slotKeys = Array(count);
     this.slotTiles = new Int32Array(count).fill(-1);
     // Use the already allocated grid's spare cells too; no larger texture.
-    const capacity = this.columns * this.rows;
+    const capacity = this.columns * this.maxRows;
     this.tileKeys = Array(capacity);
     this.tileUsers = Array.from({ length: capacity }, () => new Set<number>());
     this.reusableTiles = new Set(Array.from({ length: capacity }, (_, i) => i));
@@ -335,7 +340,7 @@ export class CoverAtlas {
         "#include <uv_vertex>",
         "#include <uv_vertex>\nvCoverReady = coverReady;\nvCoverTile = coverTile;\nvMapUv = coverTile.xy + uv * coverTile.zw;",
       );
-      shader.uniforms.coverAtlasTexel = { value: new THREE.Vector2(1 / this.atlasCanvas.width, 1 / this.atlasCanvas.height) };
+      shader.uniforms.coverAtlasTexel = this.atlas.userData.texel ??= { value: new THREE.Vector2(1 / this.atlasCanvas.width, 1 / this.atlasCanvas.height) };
       shader.fragmentShader = "varying float vCoverReady;\nvarying vec4 vCoverTile;\nuniform vec2 coverAtlasTexel;\n" + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace("#include <map_fragment>",
         "if (vCoverReady < 0.5) discard;\n" + THREE.ShaderChunk.map_fragment.replace("texture2D( map, vMapUv )", "texture2D( map, clamp(vMapUv, vCoverTile.xy + coverAtlasTexel * 0.5, vCoverTile.xy + vCoverTile.zw - coverAtlasTexel * 0.5) )"));
@@ -368,6 +373,36 @@ export class CoverAtlas {
     this.decodedImages.delete(url);
     this.decodedImages.set(url, image);
     return image;
+  }
+
+  private reserveTile(tile: number) {
+    if (tile < this.columns * this.rows) return;
+    const old = document.createElement('canvas');
+    old.width = this.atlasCanvas.width; old.height = this.atlasCanvas.height;
+    old.getContext('2d')!.drawImage(this.atlasCanvas, 0, 0);
+    this.rows = Math.min(this.maxRows, Math.max(this.rows * 2, Math.ceil((tile + 1) / this.columns)));
+    this.atlasCanvas.height = this.rows * this.tileHeight;
+    this.atlasCanvas.getContext('2d')!.drawImage(old, 0, 0);
+    old.width = old.height = 1;
+    // Resizing a canvas does not resize immutable WebGL storage. Release the
+    // old allocation and repopulate through the same bounded upload queue.
+    this.atlas.dispose();
+    this.gpuInitialized = false;
+    this.atlas.needsUpdate = true;
+    for (let i = 0; i < this.tileKeys.length; i++) {
+      if (this.tileKeys[i] !== undefined) this.dirtySlots.add(i);
+      this.tileReady[i] = 0;
+    }
+    for (let slot = 0; slot < this.slotTiles.length; slot++) {
+      const resident = this.slotTiles[slot];
+      if (resident < 0) continue;
+      this.coverTiles.setXYZW(slot, (resident % this.columns) / this.columns,
+        1 - (Math.floor(resident / this.columns) + 1) / this.rows, 1 / this.columns, 1 / this.rows);
+      this.coverReady.setX(slot, 0);
+    }
+    this.coverTiles.needsUpdate = this.coverReady.needsUpdate = true;
+    const uniform = this.atlas.userData.texel as { value: THREE.Vector2 } | undefined;
+    uniform?.value.set(1 / this.atlasCanvas.width, 1 / this.atlasCanvas.height);
   }
 
   private loadImage(url?: string, priority = false) {
@@ -407,18 +442,33 @@ export class CoverAtlas {
       this.activeJobs.add(job);
       this.peakDecodes = Math.max(this.peakDecodes, this.activeJobs.size);
       image.crossOrigin = "anonymous";
-      image.src = job.url;
+      let cooked = cookedTextureSource(job.url, job.size);
+      image.src = cooked.url;
       void image.decode()
-        .then(() => {
+        .catch(async () => {
+          // A damaged/missing cooked asset still has its preserved source.
+          if (cooked.url === job.url || this.disposed || job.generation !== this.generation) throw new Error("Cover unavailable");
+          cooked = { url: job.url };
+          image.src = job.url; await image.decode();
+        })
+        .then(async () => {
+          if (this.disposed || job.generation !== this.generation) return undefined;
+          // A foreground selection can upgrade a running thumbnail request.
+          const upgraded = cookedTextureSource(job.url, job.size);
+          if (cooked.width && image.naturalWidth < Math.min(job.size, cooked.width) && upgraded.url !== cooked.url) {
+            image.src = upgraded.url;
+            try { await image.decode(); cooked = upgraded; }
+            catch { image.src = job.url; await image.decode(); cooked = { url: job.url }; }
+          }
           if (this.disposed || job.generation !== this.generation) return undefined;
           // Background slots only retain tile-sized thumbnails. Priority can
           // upgrade an in-flight source before its canvas is produced.
-          const width = image.naturalWidth,
-            height = image.naturalHeight;
-          const scale = Math.min(1, job.size / Math.max(width, height));
+          const width = cooked.width ?? image.naturalWidth,
+            height = cooked.height ?? image.naturalHeight;
+          const scale = Math.min(1, job.size / Math.max(image.naturalWidth, image.naturalHeight));
           const source = document.createElement("canvas");
-          source.width = Math.max(1, Math.round(width * scale));
-          source.height = Math.max(1, Math.round(height * scale));
+          source.width = Math.max(1, Math.round(image.naturalWidth * scale));
+          source.height = Math.max(1, Math.round(image.naturalHeight * scale));
           source
             .getContext("2d")!
             .drawImage(image, 0, 0, source.width, source.height);
@@ -492,7 +542,13 @@ export class CoverAtlas {
     if (tile === undefined) {
       // There cannot be more active print identities than instance slots.
       // LRU order of unused tiles keeps recently viewed albums warm as well.
-      tile = this.reusableTiles.values().next().value!;
+      // Recycle unused resident storage before expanding the atlas just to
+      // keep old, invisible albums warm.
+      for (const candidate of this.reusableTiles) {
+        if (candidate < this.columns * this.rows) { tile = candidate; break; }
+      }
+      tile ??= this.reusableTiles.values().next().value!;
+      this.reserveTile(tile);
       const oldKey = this.tileKeys[tile];
       if (oldKey !== undefined) this.keyTiles.delete(oldKey);
       this.tileKeys[tile] = key;
@@ -720,6 +776,7 @@ export class CoverAtlas {
     return {
       atlasWidth: this.atlasCanvas.width, atlasHeight: this.atlasCanvas.height,
       atlasBytes: this.atlasCanvas.width * this.atlasCanvas.height * 4,
+      atlasCapacity: this.columns * this.rows, atlasMaxCapacity: this.columns * this.maxRows,
       tileWidth: this.tileWidth, tileHeight: this.tileHeight,
       activeDecodes: this.activeJobs.size, queuedDecodes: this.decodeQueue.length,
       pendingImages: this.pendingImages.size, peakDecodes: this.peakDecodes,
@@ -757,6 +814,13 @@ export class CoverAtlas {
     this.selectedRecord = undefined;
     this.selectedKey = undefined;
     this.cancelDecodes();
+    if (this.rows > Math.min(8, this.maxRows)) {
+      this.rows = Math.min(8, this.maxRows);
+      this.atlasCanvas.height = this.rows * this.tileHeight;
+      this.atlas.dispose(); this.gpuInitialized = false; this.atlas.needsUpdate = true;
+      const uniform = this.atlas.userData.texel as { value: THREE.Vector2 } | undefined;
+      uniform?.value.set(1 / this.atlasCanvas.width, 1 / this.atlasCanvas.height);
+    }
     this.dirtySlots.clear();
     this.coverReady.array.fill(0);
     this.coverReady.needsUpdate = true;

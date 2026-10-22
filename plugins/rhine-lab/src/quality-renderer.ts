@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { SMAAPass } from "three/addons/postprocessing/SMAAPass.js";
+import { LightAntialiasPass, OptionalSMAAPass } from "./antialias-pass";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { renderDimensions, type RenderQuality } from "./render-quality";
 
@@ -77,9 +77,12 @@ export function createViewerPipeline(
   camera: THREE.Camera,
 ) {
   const composer = new EffectComposer(renderer);
-  const smaa = new SMAAPass();
+  const smaa = new OptionalSMAAPass();
+  smaa.enabled = false;
+  const fxaa = new LightAntialiasPass();
   composer.addPass(new RenderPass(scene, camera));
   composer.addPass(smaa);
   composer.addPass(new OutputPass());
-  return { composer, smaa };
+  composer.addPass(fxaa);
+  return { composer, smaa, fxaa };
 }

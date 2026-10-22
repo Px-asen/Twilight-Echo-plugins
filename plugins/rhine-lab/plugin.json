@@ -1,7 +1,7 @@
 {
   "id": "com.twilightecho.experience.rhine-lab",
   "name": "莱茵生命 · 音乐档案馆",
-  "version": "0.2.9",
+  "version": "0.2.14",
   "description": "莱茵生命音乐档案馆：三维 CD、流动歌词、双主题与原版开场；歌词跟随宿主播放，保留现有画质与动效。",
   "author": "Twilight Echo contributors; RonaldDeng; LBEILC",
   "license": "MIT; see NOTICE.md",
@@ -44,6 +44,11 @@
     "docs/SUPPLEMENTARY_ASSESSMENT.md",
     "docs/PERFORMANCE_0.2.3.md",
     "docs/PERFORMANCE_0.2.4.md",
-    "docs/LYRICS-0.2.8.md"
+    "docs/LYRICS-0.2.8.md",
+    "docs/PERFORMANCE_0.2.10.md",
+    "docs/PERFORMANCE_0.2.11.md",
+    "docs/PERFORMANCE_0.2.12.md",
+    "docs/PERFORMANCE_0.2.13.md",
+    "docs/COMPARISON_0.2.14.md"
   ]
 }

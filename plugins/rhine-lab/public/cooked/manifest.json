@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "sourceHash": "f27162cdb5a3646303091a655c5a33b4190966d02de1634c60636056298dba7a",
+  "model": {
+    "file": "music-case-proxies.glb",
+    "sha256": "f1cb6e74ddd35e334921e8340ca86869e5d925c6341253e01ff3cd1df2e0056a",
+    "bytes": 54240,
+    "fullTriangles": 1000,
+    "medium": {
+      "triangles": 488
+    },
+    "far": {
+      "triangles": 232
+    }
+  },
+  "textures": {
+    "demo-covers/square.png": {
+      "width": 1254,
+      "height": 1254,
+      "sourceBytes": 2394415,
+      "sourceHash": "8380be908160ad090eb7d7a6a74c1e4893b8781228e6566c4a6a718526d79e62",
+      "levels": {
+        "256": {
+          "file": "square-256.webp",
+          "bytes": 56110,
+          "sha256": "d5f0aa8010700056e4064bb8be336a606871e5e542a3924d87ac1047925b24bf"
+        },
+        "1024": {
+          "file": "square-1024.webp",
+          "bytes": 1173558,
+          "sha256": "1e6fa173ca114372d133b82e5b08841695bdccd879b6f21e3ab42b640a202b7f"
+        }
+      }
+    },
+    "demo-covers/portrait.png": {
+      "width": 1024,
+      "height": 1536,
+      "sourceBytes": 2653624,
+      "sourceHash": "9fa43aa60f684f84714076dddb640db72c66629cedf9fdb1b11342c741d74c96",
+      "levels": {
+        "256": {
+          "file": "portrait-256.webp",
+          "bytes": 38200,
+          "sha256": "4f4cee09c7d488f0986e50667927c22ad0487c584c897ea743dddf3b49fc92f5"
+        },
+        "1024": {
+          "file": "portrait-1024.webp",
+          "bytes": 734682,
+          "sha256": "2f435c53ef95f538a1f7815f607ddc852c64f8811161364721875282274d1743"
+        }
+      }
+    },
+    "demo-covers/landscape.png": {
+      "width": 1536,
+      "height": 1024,
+      "sourceBytes": 2687593,
+      "sourceHash": "1f8a54ff348aaa1a6c08490617b95e7bd894137b5004636d6799187c710aa0a0",
+      "levels": {
+        "256": {
+          "file": "landscape-256.webp",
+          "bytes": 44448,
+          "sha256": "365324ed596f1db04e7ba3d54cc12e789bf641bc49c43ff600cccf329e95d89e"
+        },
+        "1024": {
+          "file": "landscape-1024.webp",
+          "bytes": 746196,
+          "sha256": "170fdb15fe5e81fedb75200ba6623ce6e095231d52fcb167b30fee04ecabd3f9"
+        }
+      }
+    }
+  }
+}

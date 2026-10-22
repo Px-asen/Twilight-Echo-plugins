@@ -1,8 +1,12 @@
+import { normalizeFrameRate, type FrameRate } from "./frame-limiter.ts";
+
 /** Rendering controls are independent of lighting, materials and animation. */
 export type RenderQuality = {
+  frameRate: FrameRate;
+  modelDetail: "auto" | "full";
   scale: number;
   pixelRatio: number;
-  antialias: "off" | "smaa";
+  antialias: "off" | "fxaa" | "smaa";
   shadows: number;
   aoSamples: number;
   aoResolution: number;
@@ -13,9 +17,11 @@ export type RenderQuality = {
 
 export const qualityPresets = {
   performance: {
+    frameRate: 60,
+    modelDetail: "auto",
     scale: 80,
     pixelRatio: 1,
-    antialias: "off",
+    antialias: "fxaa",
     shadows: 1024,
     aoSamples: 0,
     aoResolution: 0.5,
@@ -24,6 +30,8 @@ export const qualityPresets = {
     anisotropy: 4,
   },
   original: {
+    frameRate: 60,
+    modelDetail: "full",
     scale: 100,
     pixelRatio: 1.5,
     antialias: "off",
@@ -35,6 +43,8 @@ export const qualityPresets = {
     anisotropy: 16,
   },
   high: {
+    frameRate: 60,
+    modelDetail: "full",
     scale: 125,
     pixelRatio: 2,
     antialias: "smaa",
@@ -46,6 +56,8 @@ export const qualityPresets = {
     anisotropy: 16,
   },
   ultra: {
+    frameRate: 60,
+    modelDetail: "full",
     scale: 150,
     pixelRatio: 2,
     antialias: "smaa",
@@ -59,11 +71,20 @@ export const qualityPresets = {
 } as const satisfies Record<string, RenderQuality>;
 export type QualityPreset = keyof typeof qualityPresets;
 export const presetLabels: Record<QualityPreset, string> = {
-  performance: "性能",
-  original: "原始",
+  performance: "低需求性能版",
+  original: "原画质优化版",
   high: "高",
   ultra: "极高",
 };
+
+export function qualityDescription(quality: RenderQuality): string {
+  const preset = matchingPreset(quality);
+  if (preset === "performance")
+    return "低需求性能版：降低画面清晰度、模型细节和透明效果，关闭景深与接缝阴影；功能和面板保持完整。帧率独立设置，可选 30 FPS 进一步降低负载。";
+  if (preset === "original")
+    return "原画质优化版：保留原版清晰度、完整模型、光影和景深。";
+  return preset === "custom" ? "自定义画质：按下方设置渲染，帧率独立设置。" : "提高画面精细度，显卡和内存需求也会增加。";
+}
 
 const member = <T>(value: unknown, choices: readonly T[], fallback: T): T =>
   choices.includes(value as T) ? (value as T) : fallback;
@@ -92,11 +113,13 @@ export function normalizeQuality(
     ? base
     : { ...base, pixelRatio: 1, aoSamples: 0, depthOfField: 0 };
   return {
+    frameRate: normalizeFrameRate(v.frameRate),
+    modelDetail: member(v.modelDetail, ["auto", "full"] as const, fallback.modelDetail),
     scale: range(v.scale, 50, 200, 5, fallback.scale),
     pixelRatio: member(v.pixelRatio, [1, 1.5, 2, 3], fallback.pixelRatio),
     antialias: member(
       v.antialias,
-      ["off", "smaa"] as const,
+      ["off", "fxaa", "smaa"] as const,
       fallback.antialias,
     ),
     shadows: member(v.shadows, [0, 1024, 2048, 4096], fallback.shadows),
@@ -112,13 +135,36 @@ export function normalizeQuality(
   };
 }
 
+/** Only repair the exact stock settings shipped by 0.2.10–0.2.12. A saved
+ * revision makes subsequent deliberate choices (including 1×/auto/FXAA) stick.
+ * Custom settings, full-model choices and the independent FPS cap survive. */
+export function restoreOriginalQuality(
+  value: unknown,
+  preset: unknown,
+  revision: unknown,
+): RenderQuality {
+  const quality = normalizeQuality(value);
+  if (revision === 1 || preset !== "original" || !value || typeof value !== "object")
+    return quality;
+  const stored = value as Record<string, unknown>;
+  const degradedStock = {
+    scale: 100, pixelRatio: 1, shadows: 2048, aoSamples: 32,
+    aoResolution: 1, depthOfField: 100, transmission: 1, anisotropy: 16,
+  };
+  if ((stored.modelDetail === undefined || stored.modelDetail === "auto") &&
+      (stored.antialias === "off" || stored.antialias === "fxaa") &&
+      Object.entries(degradedStock).every(([key, expected]) => stored[key] === expected))
+    return { ...qualityPresets.original, frameRate: quality.frameRate };
+  return quality;
+}
+
 export function matchingPreset(
   quality: RenderQuality,
 ): QualityPreset | "custom" {
   return (
     (Object.keys(qualityPresets) as QualityPreset[]).find((key) =>
       Object.entries(qualityPresets[key]).every(
-        ([field, value]) => quality[field as keyof RenderQuality] === value,
+        ([field, value]) => field === "frameRate" || quality[field as keyof RenderQuality] === value,
       ),
     ) ?? "custom"
   );

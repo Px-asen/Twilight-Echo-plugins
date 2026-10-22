@@ -117,7 +117,7 @@ class Element {
   }
 }
 document = new Element('document');
-document.innerHTML = '<div id="stage"><div id="music-overview"></div><button data-action="overview"></button><div class="lighting-lab"></div><div id="music-browse"></div><div id="music-detail"></div><header class="music-header"></header><div id="three-scene"></div><div id="music-panel-root"></div></div>';
+document.innerHTML = '<div id="stage"><div id="music-overview"></div><button data-action="overview"></button><div class="lighting-lab"></div><div id="music-browse"></div><div id="music-detail"></div><div id="music-lyrics"></div><header class="music-header"></header><div id="three-scene"></div><div id="music-panel-root"></div></div>';
 const $ = selector => { const node = document.querySelector(selector); assert.ok(node, `DOM port resolves ${selector}`); return node; };
 const calls = { mount: 0, transitions: [], requests: 0, search: 0, deferRequests: false, pendingRequests: [] };
 const code = `
@@ -131,7 +131,8 @@ const code = `
   const appVersion = '0.5.0', lightingLab = false, renderQuality = {}, apiAvailable = false, demo = true;
   const library = { roots: [], albums: [], genres: [] }, stage = $('#stage');
   const esc = value => value, cancelTrackReveal = () => {}, effects = { play() {} }, notify = () => {};
-  const presentation = { phase: 'archive' }, overview = false;
+  const presentation = { phase: 'archive' }, overview = false, lyricsOpen = false;
+  const lyricsReader = { setInert() {}, setReduced() {} };
   const transportTitleMotion = { setReduced() {} }, browseTransition = { finish() {} }, detailTransition = { finish() {} }, overviewUI = { finish() {} };
   const syncSelectionMotion = () => {}, scene = { setReduced() {} }, updateSelection = () => {}, savePrefs = () => {};
   class SurfaceTransition extends ProductionSurfaceTransition {

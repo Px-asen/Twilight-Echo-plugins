@@ -1,9 +1,11 @@
 import {
   matchingPreset,
   presetLabels,
+  qualityDescription,
   type QualityPreset,
   type RenderQuality,
 } from "./render-quality";
+import { frameRates } from "./frame-limiter";
 
 function select(
   quality: RenderQuality,
@@ -29,7 +31,10 @@ export function qualityMarkup(quality: RenderQuality, music = false) {
   return `<section class="quality-settings" aria-label="画质设置">
     <div class="quality-heading"><h3>${music ? "画质" : "RENDER QUALITY <span>渲染画质</span>"}</h3><select id="quality-preset" aria-label="画质预设">${(Object.keys(presetLabels) as QualityPreset[]).map((key) => `<option value="${key}" ${preset === key ? "selected" : ""}>${presetLabels[key]}</option>`).join("")}<option value="custom" disabled ${preset === "custom" ? "selected" : ""}>自定义</option></select></div>
     <p class="quality-summary" id="quality-summary" aria-live="polite"></p>
+    <p class="quality-note" id="quality-profile-note" aria-live="polite" data-quality-profile="${preset}">${qualityDescription(quality)}</p>
+    ${select(quality, "frameRate", "帧率上限", "默认 60 FPS；降低帧率可减少显卡占用与功耗", frameRates.map((v) => [v, `${v} FPS`]))}
     <details class="quality-advanced"><summary>精细设置 <span>清晰度 / 材质 / 阴影</span></summary><div class="quality-grid">
+    ${music ? select(quality, "modelDetail", "模型细节", "原始画质使用完整模型；自动分级会减少远处倒角细节", [["auto", "自动分级"], ["full", "完整模型"]]) : ""}
     ${range(quality, "scale", "渲染比例", "相对屏幕像素，受密度上限限制；高比例改善细线", 50, 200)}
     ${select(
       quality,
@@ -38,8 +43,9 @@ export function qualityMarkup(quality: RenderQuality, music = false) {
       "控制高密度屏幕的原生像素倍率",
       [1, 1.5, 2, 3].map((v) => [v, `${v}×`]),
     )}
-    ${select(quality, "antialias", "抗锯齿", "SMAA 平滑模型边缘与后处理结果", [
-      ["off", "原始"],
+    ${select(quality, "antialias", "抗锯齿", "SMAA 保留更多细节；轻量 FXAA 会柔化细线和纹理", [
+      ["off", "关闭"],
+      ["fxaa", "轻量 FXAA"],
       ["smaa", "SMAA"],
     ])}
     ${select(
@@ -96,6 +102,11 @@ export function syncQualityUI(quality: RenderQuality) {
   const preset = document.querySelector<HTMLSelectElement>("#quality-preset");
   if (!preset) return;
   preset.value = matchingPreset(quality);
+  const note = document.querySelector<HTMLElement>("#quality-profile-note");
+  if (note) {
+    note.textContent = qualityDescription(quality);
+    note.dataset.qualityProfile = matchingPreset(quality);
+  }
   document
     .querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-quality]")
     .forEach((control) => {

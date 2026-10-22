@@ -9,6 +9,7 @@ import { MusicRealColumns } from '../src/music-real-columns.ts';
 import { isRealAlbumCell } from '../src/music-array-layout.ts';
 import { musicOverviewColumnExtent } from '../src/music-overview-edge.ts';
 import { MUSIC_MODEL, MUSIC_COLUMN_SPACING } from '../src/music-model.ts';
+import { writeMatrixIfChanged } from '../src/render-cache.ts';
 import { MusicOverviewMotion } from '../src/music-overview.ts';
 
 // Execute production field, pool and matrix updates with actual Three objects.
@@ -73,7 +74,7 @@ function fixture(selectedRow = 12) {
   const cover = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial(), count);
   // Match load(): all case parts and the print share the same transforms.
   cover.instanceMatrix = shell.instanceMatrix;
-  const deps = { ...motion, ...loop, ...data, THREE, MUSIC_MODEL, isRealAlbumCell, musicOverviewColumnExtent,
+  const deps = { ...motion, ...loop, ...data, THREE, MUSIC_MODEL, isRealAlbumCell, musicOverviewColumnExtent, writeMatrixIfChanged,
     MUSIC_ALBUM_SWITCH_RATE: 9 };
   const methods = new Function(...Object.keys(deps), compiled)(...Object.values(deps));
   const host = {

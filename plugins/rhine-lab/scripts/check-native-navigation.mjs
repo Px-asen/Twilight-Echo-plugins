@@ -1,10 +1,19 @@
 import { mkdir, writeFile, cp, readFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { createRequire } from 'node:module'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 const require = createRequire(import.meta.url)
 const { _electron: electron } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
+const execute = promisify(execFile)
+async function gpuSamples(pid) {
+  if(!Number.isInteger(pid)) throw Error('Missing isolated GPU process');
+  const script = `$rows=@(); for($i=0;$i -lt 6;$i++){ $engines=Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine | Where-Object { $_.Name -match '^pid_${pid}_.*engtype_3D$' }; $memory=Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory | Where-Object { $_.Name -match '^pid_${pid}_' }; $rows+= [pscustomobject]@{utilization=($engines | Measure-Object UtilizationPercentage -Sum).Sum;dedicatedBytes=($memory | Measure-Object DedicatedUsage -Sum).Sum;sharedBytes=($memory | Measure-Object SharedUsage -Sum).Sum}; Start-Sleep -Milliseconds 750 }; ConvertTo-Json -InputObject $rows -Compress`;
+  const result=await execute('powershell.exe',['-NoProfile','-Command',script],{windowsHide:true,timeout:20000});
+  return JSON.parse(result.stdout);
+}
 const profile = resolve('.cache/rhine-performance-' + (process.env.RHINE_PERF_LABEL || 'baseline') + '-' + Date.now())
-const pluginRoot = resolve('../Twilight-Echo-plugins/plugins/rhine-lab')
+const pluginRoot = resolve(process.env.RHINE_PLUGIN_ROOT || '../Twilight-Echo-plugins/plugins/rhine-lab')
 const manifest = JSON.parse(await readFile(join(pluginRoot, 'plugin.json'), 'utf8'))
 if(process.env.RHINE_PERF_VERSION) manifest.version=process.env.RHINE_PERF_VERSION;
 await mkdir(profile, { recursive: true })
@@ -37,7 +46,7 @@ for (let index=0;index<fixtureCount;index++) {
 }
 await writeFile(join(profile, 'music-library.json'), JSON.stringify({ version: 2, revision: 1, tracks, folders: [media], exclusions: [] }))
 await writeFile(join(profile, 'settings.json'), JSON.stringify({ onboardingCompleted: true, startupHomePage: 'local', libraryFolders: [media], volume: 0 }))
-const packageFile = resolve('../Twilight-Echo-plugins/packages', `${manifest.id}-${manifest.version}.tep`)
+const packageFile = process.env.RHINE_TEST_PACKAGE_FILE || resolve(pluginRoot, '../../packages', `${manifest.id}-${manifest.version}.tep`)
 const env = { ...process.env, RHINE_TEST_PROFILE: profile }
 delete env.ELECTRON_RUN_AS_NODE
 const nativePackage = process.env.RHINE_TEST_NATIVE_PACKAGE === '1' && process.env.RHINE_TEST_PACKAGE;
@@ -63,10 +72,10 @@ try {
   const installation = await page.evaluate(() => window.api.plugins.chooseAndInstall('package'))
   console.log('package installed', installation.plugin.id)
   const enabled = await page.evaluate(id => window.api.plugins.enable(id), manifest.id)
-  if(process.env.RHINE_TEST_QUALITY || process.env.RHINE_PERF_ARRAY_MODE) {
-    await page.evaluate(({id,quality,arrayMode})=>window.api.extensions.experiencePreferences(id, {
-      localPreferences: {'rhine-music-preferences': JSON.stringify({quality, arrayMode})}
-    }),{id:manifest.id,quality:process.env.RHINE_TEST_QUALITY||'original',arrayMode:process.env.RHINE_PERF_ARRAY_MODE||'filled'});
+  if(process.env.RHINE_TEST_QUALITY || process.env.RHINE_PERF_ARRAY_MODE || process.env.RHINE_TEST_PREFERENCES) {
+    await page.evaluate(({id,preferences})=>window.api.extensions.experiencePreferences(id, {
+      localPreferences: {'rhine-music-preferences': JSON.stringify(preferences)}
+    }),{id:manifest.id,preferences:{quality:process.env.RHINE_TEST_QUALITY||'original',arrayMode:process.env.RHINE_PERF_ARRAY_MODE||'filled',...JSON.parse(process.env.RHINE_TEST_PREFERENCES||'{}')}});
   }
   console.log('enabled', enabled.id, enabled.status)
   console.log('experiences', await page.evaluate(() => window.api.extensions.experiences()))
@@ -98,7 +107,45 @@ try {
     return {version:gl.getParameter(gl.VERSION),renderer:extension?gl.getParameter(extension.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER),devicePixelRatio};
   });
   const runs = [];
-  for (const [width,height] of (process.env.RHINE_PERF_STRESS ? [[1920,1080]] : [[1366,768],[1920,1080]])) {
+  if(process.env.RHINE_EXPECT_ORIGINAL_REPAIR) {
+    const repaired=await child.evaluate(()=>({quality:JSON.parse(document.querySelector('#three-scene').dataset.renderQuality),tiers:window.rhineMusic.stats().renderTiers}));
+    if(repaired.quality.antialias!=='off'||repaired.tiers.full<1||repaired.tiers.medium+repaired.tiers.far!==0)
+      throw Error('Original quality migration failed: '+JSON.stringify(repaired));
+    console.log('original quality migration verified',JSON.stringify(repaired));
+  }
+  if(process.env.RHINE_PERF_SMOKE) {
+    await frame.getByRole('button',{name:'设置',exact:true}).click();
+    await frame.locator('.quality-advanced summary').click();
+    const detail=frame.locator('[data-quality="modelDetail"]');
+    if(await detail.count()) {
+      await detail.selectOption('full');
+      await child.waitForFunction(()=>window.rhineMusic.stats().renderTiers.full>0);
+      await detail.selectOption('auto');
+      await child.waitForFunction(()=>window.rhineMusic.stats().renderTiers.medium+window.rhineMusic.stats().renderTiers.far>0);
+    }
+    const aa=frame.locator('[data-quality="antialias"]');
+    if(await aa.locator('option[value="fxaa"]').count()) {
+      for(const value of ['smaa','off','fxaa']) {
+        await aa.selectOption(value);
+        await child.waitForFunction(value=>JSON.parse(document.querySelector('#three-scene').dataset.renderQuality).antialias===value,value);
+        await page.waitForTimeout(200);
+      }
+    }
+    await frame.locator('#quality-preset').selectOption('original');
+    await page.screenshot({path:join(profile,'render-quality.png')});
+    await frame.locator('[data-action="close-panel"]').click();
+  }
+  for (const qualityProfile of (process.env.RHINE_PERF_PROFILES || 'current').split(',')) {
+    if(qualityProfile!=='current') {
+      await frame.getByRole('button',{name:'设置',exact:true}).click();
+      await frame.locator('#quality-preset').selectOption(qualityProfile.startsWith('performance')?'performance':'original');
+      await frame.locator('[data-quality="frameRate"]').selectOption(qualityProfile.endsWith('-30')?'30':'60');
+      const note=await frame.locator('#quality-profile-note').textContent();
+      if(qualityProfile.startsWith('performance')&&!note.includes('低需求性能版'))throw Error('Missing low-demand label');
+      await page.screenshot({path:join(profile,qualityProfile+'-settings.png')});
+      await frame.locator('[data-action="close-panel"]').click();
+    }
+  for (const [width,height] of (process.env.RHINE_PERF_STRESS || process.env.RHINE_PERF_SMOKE ? [[1920,1080]] : [[1366,768],[1920,1080]])) {
     await page.setViewportSize({width,height});
     await page.waitForTimeout(1500);
     for (const theme of ['day','night']) for(const scenario of (process.env.RHINE_PERF_POINTER ? ['pointer'] : process.env.RHINE_PERF_STRESS ? ['rapid-reverse','columns','overview','detail'] : ['rows'])) {
@@ -121,6 +168,8 @@ try {
       const session = await page.context().newCDPSession(child);
       await session.send('Profiler.enable');
       await session.send('Profiler.start');
+      const metricsBefore=await app.evaluate(({app})=>app.getAppMetrics().map(({pid,type,memory})=>({pid,type,memory})));
+      const windowsGpu=process.env.RHINE_GPU_COUNTERS ? gpuSamples(metricsBefore.find(p=>p.type==='GPU')?.pid) : Promise.resolve(undefined);
       const measured = await child.evaluate(async(scenario)=>{
         const gaps=[];let previous,start;let lastMove=-1000;
         const before=window.rhineMusic.stats(), visibilityBefore=document.visibilityState;
@@ -146,12 +195,16 @@ try {
       },scenario);
       if(measured.visibilityBefore!=='visible'||measured.visibilityAfter!=='visible'||measured.fps<5) throw Error('Occluded/hidden performance sample is invalid: '+JSON.stringify(measured));
       const {profile:cpu} = await session.send('Profiler.stop');
+      measured.windowsGpu=await windowsGpu;
+      measured.processMemory=await app.evaluate(({app})=>app.getAppMetrics().map(({pid,type,memory})=>({pid,type,memory})));
       await session.detach();
-      await writeFile(join(profile,`cpu-${width}-${theme}-${scenario}.json`),JSON.stringify(cpu));
+      await writeFile(join(profile,`cpu-${qualityProfile}-${width}-${theme}-${scenario}.json`),JSON.stringify(cpu));
       const hot=cpu.nodes.filter(n=>n.hitCount).sort((a,b)=>b.hitCount-a.hitCount).slice(0,18).map(n=>({name:n.callFrame.functionName,url:n.callFrame.url.split('/').pop(),hits:n.hitCount}));
-      runs.push({width,height,theme,scenario,...measured,hot});
+      runs.push({qualityProfile,width,height,theme,scenario,...measured,hot});
+      if(process.env.RHINE_PERF_SMOKE) await page.screenshot({path:join(profile,`native-${qualityProfile}-${theme}.png`)});
       console.log(JSON.stringify({width,height,theme,scenario,albums:tracks.length,fps:measured.fps,p95:measured.p95,p99:measured.p99,drawCalls:measured.stats.drawCalls,triangles:measured.stats.triangles,cpu:measured.timing.cpuP95,hot:hot.slice(0,5)}));
     }
+  }
   }
   if(errors.length) throw Error(errors.join('\n'));
   await writeFile(join(profile,'performance.json'),JSON.stringify({profile,version:manifest.version,albumCount:tracks.length,gpu,runs,errors},null,2));
