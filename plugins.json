@@ -159,7 +159,7 @@
     {
       "id": "com.twilightecho.provider.jellyfin",
       "name": "Jellyfin 音源",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "description": "连接自己的 Jellyfin 音乐服务器，搜索歌曲、浏览音乐库和歌单。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -174,11 +174,12 @@
       "permissions": [
         "network",
         "settings",
-        "library:read"
+        "library:read",
+        "filesystem:write"
       ],
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.jellyfin-0.1.1.tep",
-      "checksumSha256": "98d0c0f1a7219187ffbd47704ddddc27964c2436bebd5cb5dc65c30b7598059e",
+      "sourceUrl": "packages/com.twilightecho.provider.jellyfin-0.1.2.tep",
+      "checksumSha256": "0ac9f5ade22d4260a752734a6a08d7f7a9c610228113e68b192314eae666d9bf",
       "tags": [
         "provider"
       ],

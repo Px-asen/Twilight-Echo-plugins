@@ -11,6 +11,7 @@ const manifest = JSON.parse(await readFile(new URL('./plugin.json', import.meta.
 
 async function fixture(run) {
   const calls = []
+  const favorites = new Set()
   const settings = new Map()
   const originalFetch = globalThis.fetch
   globalThis.fetch = async (input, options) => {
@@ -23,6 +24,19 @@ async function fixture(run) {
     if (url.pathname.endsWith('/Users/u1')) return Response.json({ Id: 'u1', Name: 'Listener' })
     if (url.searchParams.get('IncludeItemTypes') === 'Playlist') {
       return Response.json({ Items: [{ Id: 'p1', Name: 'Playlist' }], TotalRecordCount: 1 })
+    }
+    if (url.pathname.includes('/FavoriteItems/')) {
+      const itemId = decodeURIComponent(url.pathname.split('/').at(-1))
+      if (options.method === 'DELETE') favorites.delete(itemId)
+      else favorites.add(itemId)
+      return Response.json({})
+    }
+    if (url.searchParams.get('Ids')) {
+      const matched = url.searchParams.get('Ids').split(',').filter((id) => favorites.has(id))
+      return Response.json({
+        Items: matched.map((id) => ({ Id: id, Type: 'Audio', Name: 'Song' })),
+        TotalRecordCount: matched.length
+      })
     }
     const offset = Number(url.searchParams.get('StartIndex') || 0)
     const count = Math.min(Number(url.searchParams.get('Limit') || 100), 101 - offset)
@@ -145,15 +159,33 @@ test('search and playlist pagination map tracks and preserve server-scoped ident
     assert.equal(calls.at(-1).url.searchParams.get('StartIndex'), '10')
     const stream = new URL(await provider.getPlaybackUrl(page.items[0]))
     assert.equal(stream.pathname, '/jellyfin/Audio/10/universal')
-    assert.equal(stream.searchParams.get('api_key'), 'fixture-token')
+    assert.equal(stream.searchParams.get('ApiKey'), 'fixture-token')
     assert.equal(stream.searchParams.get('UserId'), 'u1')
+    assert.equal(stream.searchParams.get('api_key'), null)
     assert.equal(new URL(page.items[0].cover).pathname, '/jellyfin/Items/10/Images/Primary')
+    const library = await provider.fetchUserLibrary(false)
+    assert.deepEqual(library.playlists.map((item) => item.id), ['@all', 'p1'])
+    assert.equal(library.playlists[0].trackCount, 101)
     assert.deepEqual(
-      (await provider.fetchUserLibrary()).playlists.map((item) => item.id),
-      ['@all', 'p1']
+      library.likedPlaylist,
+      { id: '@favorite', name: '收藏', cover: null, trackCount: 101 }
     )
+    // 库摘要（收藏数/全部音乐数）刻意不缓存：每次都必须重新问服务端，
+    // 否则头部计数会与曲目列表错位。
+    const callsBeforeSummary = calls.length
+    const refreshed = await provider.fetchUserLibrary(false)
+    assert.ok(calls.length > callsBeforeSummary)
+    assert.deepEqual(refreshed.likedPlaylist, library.likedPlaylist)
+    // 曲目列表仍走 TTL 缓存
+    const callsBeforeTracks = calls.length
     assert.equal((await provider.fetchPlaylistTracks('p1')).length, 101)
-    assert.equal((await provider.fetchPlaylistTracks('@all')).length, 101)
+    assert.equal((await provider.fetchPlaylistTracks('p1')).length, 101)
+    assert.equal(calls.length, callsBeforeTracks + 1)
+    const allTracks = await provider.fetchPlaylistTracks('@all')
+    assert.equal(allTracks.length, 101)
+    assert.equal((await provider.fetchPlaylistTracks('@all')).length, allTracks.length)
+    assert.equal((await provider.fetchPlaylistTracks('@favorite')).length, 101)
+    assert.equal(calls.at(-1).url.searchParams.get('IsFavorite'), 'true')
     await assert.rejects(provider.getPlaybackUrl({ id: 'jellyfin:other:10' }), /另一台/)
   }))
 
@@ -178,4 +210,31 @@ test('failed login preserves the session and cancelled requests do not return me
       provider.getPlaybackUrl({ id: 'anything' }, {}, { signal: controller.signal }),
       /cancelled/
     )
+  }))
+
+test('server favorites toggle state and scope validation', async () =>
+  fixture(async ({ provider, calls }) => {
+    await provider.loginWithServer(
+      'https://fixture.invalid/jellyfin',
+      'Listener',
+      'fixture-password'
+    )
+    const page = await provider.searchSongs('Song', 1, 0)
+    const track = page.items[0]
+    // 宿主 likeTrack/isTrackLiked 传入的是剥掉 `jellyfin:` 前缀的 local id
+    const hostId = track.id.slice('jellyfin:'.length)
+    assert.equal(hostId.startsWith('jellyfin:'), false)
+    assert.equal(await provider.isTrackLiked(hostId), false)
+    await provider.likeTrack(hostId, true)
+    assert.equal(calls.at(-1).options.method, 'POST')
+    assert.equal(calls.at(-1).url.pathname, '/jellyfin/Users/u1/FavoriteItems/0')
+    assert.equal(await provider.isTrackLiked(hostId), true)
+    // 播放路径仍接受完整 track id
+    assert.equal(await provider.isTrackLiked(track), true)
+    await provider.likeTrack(track, false)
+    assert.equal(calls.at(-1).options.method, 'DELETE')
+    assert.equal(await provider.isTrackLiked(hostId), false)
+    await assert.rejects(provider.isTrackLiked({ id: 'other:1' }), /另一台/)
+    await assert.rejects(provider.likeTrack({ id: 'other:1' }, true), /另一台/)
+    await assert.rejects(provider.isTrackLiked('jellyfin:other:1'), /另一台/)
   }))
