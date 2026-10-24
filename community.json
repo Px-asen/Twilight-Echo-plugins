@@ -10,13 +10,13 @@
       "version": "2.0.1",
       "checksumSha256": "1e0093715eba4565ebea4f35189e9f05a8fa8b72c5c03612397b626c9adc2cff"
     },
-    "com.twilightecho.tool.wallpaper-engine": {
-      "version": "2.1.1",
-      "checksumSha256": "4bf10f1994c3eb2fab368fc4d4e85b325f6e3800fefd0bbf7cb222f5530286cd"
-    },
     "com.sh1rotr1.powerpulse": {
       "version": "0.1.0",
       "checksumSha256": "12c293d0e0b8e5e5801b25406e12c99748a7b8fd4d74a6d25c15bbab32e844f2"
+    },
+    "com.twilightecho.tool.wallpaper-engine": {
+      "version": "2.1.1",
+      "checksumSha256": "4bf10f1994c3eb2fab368fc4d4e85b325f6e3800fefd0bbf7cb222f5530286cd"
     }
   },
   "plugins": [
