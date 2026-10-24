@@ -2,7 +2,8 @@
   "schemaVersion": 1,
   "owners": {
     "com.github.iris-sci.playlist-bridge": "https://github.com/IRIS-SCI/twilight-playlist-bridge",
-    "com.twilightecho.tool.wallpaper-engine": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine"
+    "com.twilightecho.tool.wallpaper-engine": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine",
+    "com.sh1rotr1.powerpulse": "https://github.com/Sh1rotr1/twilight-echo-powerpulse"
   },
   "history": {
     "com.github.iris-sci.playlist-bridge": {
@@ -12,6 +13,10 @@
     "com.twilightecho.tool.wallpaper-engine": {
       "version": "2.1.1",
       "checksumSha256": "4bf10f1994c3eb2fab368fc4d4e85b325f6e3800fefd0bbf7cb222f5530286cd"
+    },
+    "com.sh1rotr1.powerpulse": {
+      "version": "0.1.0",
+      "checksumSha256": "12c293d0e0b8e5e5801b25406e12c99748a7b8fd4d74a6d25c15bbab32e844f2"
     }
   },
   "plugins": [
@@ -27,6 +32,18 @@
         "m3u8",
         "playlist",
         "twilight-echo",
+        "community"
+      ]
+    },
+    {
+      "id": "com.sh1rotr1.powerpulse",
+      "version": "0.1.0",
+      "repository": "https://github.com/Sh1rotr1/twilight-echo-powerpulse",
+      "sourceUrl": "https://github.com/Sh1rotr1/twilight-echo-powerpulse/releases/download/v0.1.0/com.sh1rotr1.powerpulse-0.1.0.tep",
+      "checksumSha256": "12c293d0e0b8e5e5801b25406e12c99748a7b8fd4d74a6d25c15bbab32e844f2",
+      "tags": [
+        "tool",
+        "ui",
         "community"
       ]
     },
