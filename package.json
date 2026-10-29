@@ -22,6 +22,11 @@
     "pack:qishui": "node scripts/pack-plugin.cjs qishui-provider && pnpm run index",
     "pack:navidrome": "node scripts/pack-plugin.cjs navidrome-provider && pnpm run index",
     "pack:dynamic-island": "node scripts/pack-plugin.cjs dynamic-island && pnpm run index",
+    "test:echo-assistant": "node --experimental-strip-types --test plugins/echo-assistant/agent/*.test.mjs plugins/echo-assistant/gateway.test.mjs plugins/echo-assistant/ui/test/*.test.mjs",
+    "build:echo-assistant": "npm --prefix plugins/echo-assistant/ui run build",
+    "pack:echo-assistant": "node scripts/pack-plugin.cjs echo-assistant",
+    "test:echo-assistant:ui": "node plugins/echo-assistant/test/ui-smoke.mjs",
+    "test:echo-assistant:electron": "node plugins/echo-assistant/test/smoke.mjs",
     "build:kugou-vendor": "node scripts/build-kugou-vendor.mjs"
   },
   "devDependencies": {
