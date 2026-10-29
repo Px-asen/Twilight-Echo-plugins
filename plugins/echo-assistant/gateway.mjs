@@ -26,6 +26,13 @@ import { abortable, throwIfAborted } from './agent/runtime.mjs'
 const PROMPTS_KEY = 'assistant.prompts'
 const CONFIG_KEY = 'assistant.config'
 const EVENT_NAME = 'chat'
+/** Sessions idle longer than this are treated as expired and not reused. */
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000
+
+function isExpired(session) {
+  const updatedAt = Date.parse(session?.updatedAt ?? '')
+  return Number.isFinite(updatedAt) && Date.now() - updatedAt > SESSION_TTL_MS
+}
 
 export function createGateway(context) {
   const history = createHistory({ storagePath: context.storagePath })
