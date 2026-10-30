@@ -207,7 +207,7 @@
     {
       "id": "com.twilightecho.provider.bilibili",
       "name": "Bilibili 收藏夹音源",
-      "version": "0.1.18",
+      "version": "0.2.0",
       "description": "在流媒体页的 Bilibili 入口中搜索视频并播放收藏夹音频。支持搜索、多 P 展开、Cookie 静默刷新与 DASH 高音质播放。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -226,10 +226,30 @@
         "ui:inject",
         "library:read"
       ],
+      "androidRuntime": {
+        "apiVersion": 2,
+        "entry": "android/provider.js",
+        "permissions": [
+          "network",
+          "settings"
+        ],
+        "networkHosts": [
+          "api.bilibili.com",
+          "passport.bilibili.com",
+          "www.bilibili.com"
+        ],
+        "mediaHosts": [
+          "*.bilivideo.com",
+          "*.bilivideo.cn",
+          "*.szbdyd.com",
+          "upos-hz-mirrorakam.akamaized.net",
+          "*.hdslb.com"
+        ]
+      },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.bilibili-0.1.18.tep",
-      "checksumSha256": "cc70d0b7a2a5c5714ba0647d4537e523b3bcf708167434345b68d73ea1549c7b",
+      "sourceUrl": "packages/com.twilightecho.provider.bilibili-0.2.0.tep",
+      "checksumSha256": "01e5702916d475422a66ebe523dfc6eace1c48f81459170cb46983673681d80f",
       "tags": [
         "provider",
         "ui",
@@ -240,7 +260,7 @@
     {
       "id": "com.twilightecho.provider.jellyfin",
       "name": "Jellyfin 音源",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "description": "连接自己的 Jellyfin 音乐服务器，搜索歌曲、浏览音乐库和歌单。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -258,9 +278,20 @@
         "library:read",
         "filesystem:write"
       ],
+      "androidRuntime": {
+        "apiVersion": 2,
+        "entry": "android/provider.js",
+        "permissions": [
+          "network",
+          "settings"
+        ],
+        "networkHosts": [],
+        "mediaHosts": [],
+        "userServer": true
+      },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.jellyfin-0.1.2.tep",
-      "checksumSha256": "0ac9f5ade22d4260a752734a6a08d7f7a9c610228113e68b192314eae666d9bf",
+      "sourceUrl": "packages/com.twilightecho.provider.jellyfin-0.2.0.tep",
+      "checksumSha256": "06e8d7baedfc578ceed949ad65f7dcc02eb3329a42452c6c3083f192511d8c2c",
       "tags": [
         "provider"
       ],
@@ -269,7 +300,7 @@
     {
       "id": "com.twilightecho.provider.kugou",
       "name": "酷狗音乐音源",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "description": "酷狗每日推荐、私人 FM、飙升榜与 Hi-Res 歌单，支持搜索、播放、歌词和扫码登录；API 服务内置并仅监听本机。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -288,10 +319,35 @@
         "ui:inject",
         "library:read"
       ],
+      "androidRuntime": {
+        "apiVersion": 2,
+        "entry": "android/provider.js",
+        "permissions": [
+          "network",
+          "settings"
+        ],
+        "networkHosts": [
+          "gateway.kugou.com",
+          "login-user.kugou.com",
+          "userservice.kugou.com",
+          "lyrics.kugou.com",
+          "songsearch.kugou.com",
+          "msearchcdn.kugou.com"
+        ],
+        "mediaHosts": [
+          "*.kugou.com",
+          "*.kgimg.com"
+        ],
+        "cleartextHosts": [
+          "msearchcdn.kugou.com",
+          "fs.youthandroid.kugou.com",
+          "fs.youthandroid2.kugou.com"
+        ]
+      },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.kugou-0.3.0.tep",
-      "checksumSha256": "b1de88864aa44545f4729062525ef7b281577b328997ab9b65bc38d067ae2783",
+      "sourceUrl": "packages/com.twilightecho.provider.kugou-0.4.0.tep",
+      "checksumSha256": "4b44386c8f615f5e3ffc9be016d6181327e4405c7507bb53eea2e3f1bc222385",
       "tags": [
         "provider",
         "ui",
@@ -302,7 +358,7 @@
     {
       "id": "com.twilightecho.provider.navidrome",
       "name": "Navidrome 音源",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "连接 Navidrome 音乐服务器，提供搜索、播放、封面、歌词和歌单功能。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -319,10 +375,21 @@
         "settings",
         "library:read"
       ],
+      "androidRuntime": {
+        "apiVersion": 2,
+        "entry": "android/provider.js",
+        "permissions": [
+          "network",
+          "settings"
+        ],
+        "networkHosts": [],
+        "mediaHosts": [],
+        "userServer": true
+      },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins/tree/main/plugins/navidrome-provider",
-      "sourceUrl": "packages/com.twilightecho.provider.navidrome-1.0.0.tep",
-      "checksumSha256": "1fb14c9cd25a39814eff0e2b9337da240089836ab4fc6c8ae4d6ea5b21caf3b9",
+      "sourceUrl": "packages/com.twilightecho.provider.navidrome-1.1.0.tep",
+      "checksumSha256": "2800b2b58e9b2ef1e43fa6d11d6fcc52ab75b7505f46760f071dae4d048eca54",
       "tags": [
         "provider"
       ],
@@ -331,7 +398,7 @@
     {
       "id": "com.twilightecho.provider.qishui",
       "name": "汽水音乐音源",
-      "version": "0.4.6",
+      "version": "0.5.0",
       "description": "汽水音乐原生 Provider：发现主页、推荐歌单、个人音乐库、搜索、封面、歌词与播放音源；支持宿主安全扫码登录。",
       "author": "OpenAI",
       "license": "Apache-2.0",
@@ -357,10 +424,34 @@
         "ui:inject",
         "library:read"
       ],
+      "androidRuntime": {
+        "apiVersion": 2,
+        "entry": "android/provider.js",
+        "permissions": [
+          "network",
+          "settings"
+        ],
+        "networkHosts": [
+          "api.qishui.com",
+          "beta-luna.douyin.com",
+          "music.douyin.com"
+        ],
+        "mediaHosts": [
+          "*.qishui.com",
+          "*.douyin.com",
+          "*.byteplusapi.com",
+          "*.volcengineapi.com",
+          "*.bytedanceapi.com",
+          "*.douyinvod.com",
+          "*.douyinpic.com",
+          "*.douyinstatic.com",
+          "*.zjcdn.com"
+        ]
+      },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.qishui-0.4.6.tep",
-      "checksumSha256": "62f51f0ff8f75d6d7723a57e8e4189e30d32fbff2493e6d4e02adc93634019b1",
+      "sourceUrl": "packages/com.twilightecho.provider.qishui-0.5.0.tep",
+      "checksumSha256": "95a30c7d02abd909564108ef486e980b9909339e7bf40bdf82a1f551a50a70e9",
       "tags": [
         "provider",
         "ui"
@@ -370,7 +461,7 @@
     {
       "id": "com.twilightecho.provider.qqmusic",
       "name": "QQ 音乐音源",
-      "version": "0.3.3",
+      "version": "0.4.0",
       "description": "QQ 音乐每日推荐、巅峰飙升榜、热歌榜与精选歌单，支持发现分类、搜索、歌词、原生扫码登录和用户歌单。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -389,10 +480,32 @@
         "ui:inject",
         "library:read"
       ],
+      "androidRuntime": {
+        "apiVersion": 2,
+        "entry": "android/provider.js",
+        "permissions": [
+          "network",
+          "settings"
+        ],
+        "networkHosts": [
+          "u.y.qq.com",
+          "c.y.qq.com",
+          "y.qq.com",
+          "mu.y.qq.com",
+          "api.tencentmusic.com"
+        ],
+        "mediaHosts": [
+          "*.stream.qqmusic.qq.com",
+          "y.gtimg.cn",
+          "qpic.y.qq.com",
+          "*.qpic.cn",
+          "*.qlogo.cn"
+        ]
+      },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.qqmusic-0.3.3.tep",
-      "checksumSha256": "7442012154e5859eb3bfd80ef24fcb98e368c913913c59272042249fd6aa0eee",
+      "sourceUrl": "packages/com.twilightecho.provider.qqmusic-0.4.0.tep",
+      "checksumSha256": "f73d8fcdbdcf8fce2c824d56ca4131c665609ff7ba38b6aedc40f39d046ff42d",
       "tags": [
         "provider",
         "ui",
@@ -403,7 +516,7 @@
     {
       "id": "com.twilightecho.provider.ytmusic",
       "name": "YouTube Music 音源",
-      "version": "1.0.5",
+      "version": "1.1.0",
       "description": "在 Twilight Echo 流媒体区搜索和播放 YouTube Music 曲库。基于 ytmusicapi 解析逻辑重构，支持搜索、播放、歌词、歌单和用户媒体库。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -422,10 +535,30 @@
         "ui:inject",
         "library:read"
       ],
+      "androidRuntime": {
+        "apiVersion": 2,
+        "entry": "android/provider.js",
+        "permissions": [
+          "network",
+          "settings"
+        ],
+        "networkHosts": [
+          "music.youtube.com",
+          "www.youtube.com",
+          "www.googleapis.com",
+          "oauth2.googleapis.com"
+        ],
+        "mediaHosts": [
+          "*.googlevideo.com",
+          "*.ytimg.com",
+          "*.ggpht.com",
+          "*.googleusercontent.com"
+        ]
+      },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.ytmusic-1.0.5.tep",
-      "checksumSha256": "314f0cd1c0ce1c915f872d2c088f72fcaace1232ad1491f7c02ec995a3c2d196",
+      "sourceUrl": "packages/com.twilightecho.provider.ytmusic-1.1.0.tep",
+      "checksumSha256": "fb300a904639cb8841e55cdfbbd88d83b598b7fc3c18b090ce01ede11b647381",
       "tags": [
         "provider",
         "ui",

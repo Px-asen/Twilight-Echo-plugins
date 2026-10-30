@@ -11,7 +11,7 @@
     "build:r2": "node scripts/build-r2.mjs",
     "deploy:r2": "node scripts/deploy-r2.mjs",
     "test:r2": "node --test scripts/r2.test.mjs",
-    "test": "node --test plugins/*/*.test.mjs scripts/*.test.mjs",
+    "test": "node --test plugins/*/*.test.mjs scripts/*.test.mjs sdk/android/*.test.mjs",
     "index": "node scripts/generate-index.mjs",
     "validate:index": "node scripts/generate-index.mjs --validate",
     "discover": "node scripts/discover-community.mjs",
@@ -27,7 +27,8 @@
     "pack:echo-assistant": "node scripts/pack-plugin.cjs echo-assistant",
     "test:echo-assistant:ui": "node plugins/echo-assistant/test/ui-smoke.mjs",
     "test:echo-assistant:electron": "node plugins/echo-assistant/test/smoke.mjs",
-    "build:kugou-vendor": "node scripts/build-kugou-vendor.mjs"
+    "build:kugou-vendor": "node scripts/build-kugou-vendor.mjs",
+    "build:android": "node sdk/android/build.mjs"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",

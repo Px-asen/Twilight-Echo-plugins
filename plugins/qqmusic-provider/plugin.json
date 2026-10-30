@@ -1,7 +1,7 @@
 {
   "id": "com.twilightecho.provider.qqmusic",
   "name": "QQ 音乐音源",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "QQ 音乐每日推荐、巅峰飙升榜、热歌榜与精选歌单，支持发现分类、搜索、歌词、原生扫码登录和用户歌单。",
   "author": "Px-asen",
   "license": "Apache-2.0",
@@ -12,6 +12,13 @@
   },
   "apiVersion": 1,
   "permissions": ["network", "settings", "ui:inject", "library:read"],
+  "androidRuntime": {
+    "apiVersion": 2,
+    "entry": "android/provider.js",
+    "permissions": ["network", "settings"],
+    "networkHosts": ["u.y.qq.com", "c.y.qq.com", "y.qq.com", "mu.y.qq.com", "api.tencentmusic.com"],
+    "mediaHosts": ["*.stream.qqmusic.qq.com", "y.gtimg.cn", "qpic.y.qq.com", "*.qpic.cn", "*.qlogo.cn"]
+  },
   "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
   "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins"
 }

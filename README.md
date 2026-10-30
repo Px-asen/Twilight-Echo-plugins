@@ -72,7 +72,9 @@ community.json             # automatically discovered plugins and ID ownership h
 plugins.json
 ```
 
-- `plugins/<name>/` contains plugin source code.
+- `plugins/<name>/` contains plugin source code. Providers with an Android
+  version also contain `android.mjs` (see [Android 版本](#android-版本)).
+- `sdk/android/` contains the Android runtime, build script and test harness.
 - `packages/` contains installable `.tep` packages.
 - `catalog/` contains reviewed listings for independent repositories.
 - `community.json` is maintained by the discovery workflow.
@@ -220,6 +222,26 @@ The generated package intentionally includes only runtime files such as
 `plugin.json` and `index.mjs`; tests and development files are excluded. If a
 plugin contains `THIRD_PARTY_NOTICES.md`, the packer includes that supplemental
 license/attribution file alongside the runtime files.
+
+## Android 版本
+
+音源插件的 Android 版本和桌面版放在同一个插件目录，使用同一个插件 ID 和版本号：
+`android.mjs` 通过 [`sdk/android`](sdk/android/README.md) 把桌面入口 `index.mjs` 适配到
+Android 插件宿主，`plugin.json` 的 `androidRuntime` 声明脚本路径和允许访问的主机。打包时
+`scripts/pack-plugin.cjs` 把 `android.mjs` 构建为 `android/provider.js` 并放进同一个 `.tep`，
+桌面端不加载这个文件。
+
+目前提供 Android 版本的音源有 Bilibili、Jellyfin、酷狗音乐、Navidrome、汽水音乐、QQ 音乐和
+YouTube Music。其它插件不声明 `androidRuntime`，在 Android 插件列表中显示为“移动端不适配”。
+
+修改音源代码、`android.mjs` 或 `sdk/android` 后要提高插件版本并重新打包，`pnpm test`
+会检查包里的 Android 脚本是否与当前源码的构建结果一致。只查看构建结果：
+
+```sh
+pnpm run build:android plugins/navidrome-provider --no-minify
+```
+
+`androidRuntime` 字段、宿主 API 和离线测试方法见 [Android 插件 SDK](sdk/android/README.md)。
 
 ## Use From GitHub
 

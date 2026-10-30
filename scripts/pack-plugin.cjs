@@ -3,6 +3,7 @@ const fs = require('node:fs/promises')
 const path = require('node:path')
 
 const { existsSync } = require('node:fs')
+const { pathToFileURL } = require('node:url')
 const DEFAULT_TWILIGHT_ROOT = ['Twilight_Echo', 'Twilight_Echo-main']
   .map(name => path.resolve(__dirname, '..', '..', name))
   .find(root => existsSync(path.join(root, 'packages/create-twilight-plugin/lib/zip.cjs')))
@@ -117,6 +118,18 @@ async function main() {
     }
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error
+  }
+
+  // Providers with an Android runtime ship the QuickJS script that
+  // sdk/android/build.mjs bundles from android.mjs (the source stays out).
+  if (rawManifest.androidRuntime) {
+    const { buildAndroidPlugin } = await import(
+      pathToFileURL(path.join(repoRoot, 'sdk', 'android', 'build.mjs')).href
+    )
+    const { code } = await buildAndroidPlugin(pluginRoot, {
+      outfile: path.join(stagingDir, ...rawManifest.androidRuntime.entry.split('/'))
+    })
+    console.log(`Built ${rawManifest.androidRuntime.entry} (${code.length} chars)`)
   }
 
   for (const experience of rawManifest.contributes?.experiences ?? []) {

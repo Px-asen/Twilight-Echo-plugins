@@ -106,6 +106,7 @@ test("Navidrome marketplace package and index match the source and checksum", as
       : ["-tf", fileURLToPath(archive)];
   const { stdout } = await execute(executable, args);
   assert.deepEqual(stdout.trim().split(/\r?\n/).sort(), [
+    manifest.androidRuntime.entry,
     "index.mjs",
     "plugin.json",
   ]);

@@ -1,7 +1,7 @@
 {
   "id": "com.twilightecho.provider.kugou",
   "name": "酷狗音乐音源",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "酷狗每日推荐、私人 FM、飙升榜与 Hi-Res 歌单，支持搜索、播放、歌词和扫码登录；API 服务内置并仅监听本机。",
   "author": "Px-asen",
   "license": "Apache-2.0",
@@ -12,6 +12,21 @@
   },
   "apiVersion": 1,
   "permissions": ["network", "settings", "ui:inject", "library:read"],
+  "androidRuntime": {
+    "apiVersion": 2,
+    "entry": "android/provider.js",
+    "permissions": ["network", "settings"],
+    "networkHosts": [
+      "gateway.kugou.com",
+      "login-user.kugou.com",
+      "userservice.kugou.com",
+      "lyrics.kugou.com",
+      "songsearch.kugou.com",
+      "msearchcdn.kugou.com"
+    ],
+    "mediaHosts": ["*.kugou.com", "*.kgimg.com"],
+    "cleartextHosts": ["msearchcdn.kugou.com", "fs.youthandroid.kugou.com", "fs.youthandroid2.kugou.com"]
+  },
   "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
   "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins"
 }
