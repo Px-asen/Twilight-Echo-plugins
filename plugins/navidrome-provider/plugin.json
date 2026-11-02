@@ -1,7 +1,7 @@
 {
   "id": "com.twilightecho.provider.navidrome",
   "name": "Navidrome 音源",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "连接 Navidrome 音乐服务器，提供搜索、播放、封面、歌词和歌单功能。",
   "author": "Px-asen",
   "license": "Apache-2.0",

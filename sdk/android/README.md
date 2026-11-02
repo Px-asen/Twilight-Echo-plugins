@@ -143,9 +143,11 @@ await harness.close()
 
 `harness.invoke(request)` 返回原始信封，`harness.resolveMedia(url, kind)` 测试代理地址解析。
 
+参考宿主会移除 `BigInt`，并模拟 QuickJS 不支持 V8 堆栈格式化的行为。`Error.captureStackTrace` 由 SDK 提供，支持 `prepareStackTrace` 请求 `depd` 所需的 CallSite 方法；只有引擎实际提供的函数名、文件名和行列位置会出现在结果中，接收者和方法元数据不可用。
+
 ## 限制
 
 - 脚本最多 4,000,000 字符；插件进程内存上限 96 MiB，单次调用最长 60 秒。
 - 没有真实文件系统：`fs` 是插件进程内的内存文件系统，读取包里的文件会得到 `ENOENT`。也没有子进程、`worker_threads`、`tls`、原生模块和动态下载代码。
 - `node:http` 服务器不监听真实端口，只能被同一插件里的 `fetch` 和上面的代理解析访问。
-- QuickJS 没有 `Intl`；`WeakRef` 是强引用。
+- Android 的 QuickJS 构建没有 `Intl` 和 `BigInt`；`WeakRef` 是强引用。

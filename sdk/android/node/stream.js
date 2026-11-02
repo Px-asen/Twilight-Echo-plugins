@@ -44,6 +44,7 @@ export function Readable(options) {
     ended: false,
     endEmitted: false,
     flowing: null,
+    readStarted: false,
     reading: false,
     scheduled: false,
     encoding: options.encoding || null,
@@ -96,8 +97,10 @@ define(Readable.prototype, {
   },
   read() {
     const state = this._readableState
+    state.readStarted = true
     if (!state.buffer.length) {
       this._pull()
+      this._schedule()
       return null
     }
     const chunk = state.buffer.shift()
@@ -138,7 +141,7 @@ define(Readable.prototype, {
       this.emit('data', this._decode(state.buffer.shift()))
     }
     if (!state.buffer.length && state.ended) {
-      if (!state.endEmitted && state.flowing !== false) {
+      if (!state.endEmitted && (state.flowing === true || state.readStarted)) {
         state.endEmitted = true
         this.readable = false
         this.emit('end')

@@ -108,6 +108,49 @@ test('the runtime gives desktop code its web globals and ES2021+ built-ins on Qu
   assert.deepEqual(value.node, ['function', 'object', 'number'])
 })
 
+test('captureStackTrace supplies lazy structured CallSites without native V8 support', async () => {
+  const harness = await load(provider(`
+    searchSongs() {
+      let calls = 0
+      Error.prepareStackTrace = (error, frames) => { calls++; return frames }
+      function capture() { const target = {}; Error.captureStackTrace(target, capture); return target }
+      function caller() { return capture() }
+      const target = caller()
+      const before = calls
+      const frames = target.stack
+      const cached = target.stack === frames
+      const name = frames[0].getFunctionName()
+      const structured = frames.every((frame) => typeof frame.getFileName === 'function' && typeof frame.getLineNumber === 'function')
+      const after = calls
+      delete Error.prepareStackTrace
+      const existing = new Error('existing')
+      Error.captureStackTrace(existing)
+      const text = existing.stack
+      const hidden = !Object.keys(target).includes('stack')
+      target.stack = 'overridden'
+      const frozen = Object.freeze({ stack: 'preserved' })
+      Error.captureStackTrace(frozen)
+      Error.stackTraceLimit = 1
+      Error.prepareStackTrace = (error, sites) => sites
+      const limited = capture().stack.length
+      delete Error.prepareStackTrace
+      return { before, after, cached, name, structured, text, hidden, overridden: target.stack, frozen: frozen.stack, limited }
+    }
+  `))
+  harness.activate()
+  const value = harness.call('searchSongs')
+  assert.equal(value.before, 0)
+  assert.equal(value.after, 1)
+  assert.equal(value.cached, true)
+  assert.equal(value.name, 'caller')
+  assert.equal(value.structured, true)
+  assert.match(value.text, /^Error: existing\n    at /)
+  assert.equal(value.hidden, true)
+  assert.equal(value.overridden, 'overridden')
+  assert.equal(value.frozen, 'preserved')
+  assert.equal(value.limited, 1)
+})
+
 test('fetch runs through the host: chunked and binary bodies, redirects, grants and the HTTPS upgrade', async () => {
   const large = 'x'.repeat(300_000)
   const routes = (request) => {
@@ -258,6 +301,26 @@ const gzipped = ${JSON.stringify(gzipSync('gunzipped').toString('base64'))}`
     // Android has no Brotli codec.
     brotli: '不支持的压缩方式 brotliDecompress'
   })
+})
+
+test('an unread empty Node request does not close before its proxy fetch can run', async () => {
+  const harness = await load(provider(`
+    async searchSongs() {
+      const unread = new Readable({ read() {} })
+      const events = []
+      unread.on('end', () => events.push('end'))
+      unread.on('close', () => events.push('close'))
+      unread.push(null)
+      await Promise.resolve()
+      const beforeRead = events.slice()
+      unread.read()
+      await Promise.resolve()
+      const afterRead = events.slice()
+      return { beforeRead, afterRead }
+    }
+  `, { imports: "import { Readable } from 'node:stream'" }))
+  harness.activate()
+  assert.deepEqual(harness.call('searchSongs'), { beforeRead: [], afterRead: ['end', 'close'] })
 })
 
 test('loopback proxy URLs resolve to the upstream request the player opens itself', async () => {

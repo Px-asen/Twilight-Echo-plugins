@@ -1,7 +1,7 @@
 {
   "id": "com.twilightecho.provider.qishui",
   "name": "汽水音乐音源",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "汽水音乐原生 Provider：发现主页、推荐歌单、个人音乐库、搜索、封面、歌词与播放音源；支持宿主安全扫码登录。",
   "author": "OpenAI",
   "license": "Apache-2.0",

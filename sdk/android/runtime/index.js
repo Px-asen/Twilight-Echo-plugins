@@ -26,6 +26,7 @@ import { Blob, File, FormData, Headers, ReadableStream, Request, Response, fetch
 import { WebSocket } from './websocket.js'
 import { webcrypto } from './webcrypto.js'
 import process from '../node/process.js'
+import { captureStackTrace } from './stack.js'
 
 // Installs the web/Node globals desktop plugins expect into the bare QuickJS
 // context. Imported first by every Android bundle (see build.mjs), so plugin
@@ -166,14 +167,7 @@ if (typeof globalThis.FinalizationRegistry !== 'function') {
   define(globalThis, 'FinalizationRegistry', FinalizationRegistry)
 }
 
-define(Error, 'captureStackTrace', function captureStackTrace(target) {
-  if (!target || typeof target !== 'object') return
-  try {
-    if (!('stack' in target)) target.stack = new Error(target.message).stack
-  } catch {
-    // frozen errors keep their own stack
-  }
-})
+define(Error, 'captureStackTrace', captureStackTrace)
 if (Error.stackTraceLimit === undefined) Error.stackTraceLimit = 10
 
 // ── structuredClone ───────────────────────────────────────────────────────

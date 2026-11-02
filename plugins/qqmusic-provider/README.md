@@ -4,7 +4,7 @@ Twilight Echo 的 QQ 音乐 Provider 插件。
 
 - 插件 ID：`com.twilightecho.provider.qqmusic`
 - Provider ID：`qq`
-- 当前版本：`0.3.2`
+- 当前版本：`0.4.1`
 
 ## 功能
 

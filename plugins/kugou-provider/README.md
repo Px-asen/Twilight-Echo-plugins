@@ -4,7 +4,7 @@ Twilight Echo 的酷狗音乐 Provider 插件。
 
 - 插件 ID：com.twilightecho.provider.kugou
 - Provider ID：kugou
-- 当前版本：0.3.0
+- 当前版本：0.4.1
 
 ## 前置条件
 
@@ -40,6 +40,14 @@ Twilight Echo 的酷狗音乐 Provider 插件。
 1. 安装插件并确认免责声明（服务自动随应用启动，无需任何外部部署）。
 2. 在流媒体页直接搜索歌曲、歌手或歌单；播放及访问个人歌单前，在登录页重新扫码一次。
 3. 在首页选择酷狗，浏览每日推荐或播放私人 FM；在「发现更多」进入 Hi-Res 歌单专区。
+
+### Android 0.4.1 更新
+
+`0.4.1` 修复获取二维码时的 `not a function`：Android SDK 现在为 Express 的 `depd` 提供结构化堆栈，并使用不依赖 `BigInt` 的方式生成、保存匿名设备标识。已有设备 Cookie 中的标识会继续使用。
+
+同时修复 Android 的空请求流过早触发关闭、导致播放代理在解析 CDN 地址前被取消的问题。
+
+升级后重新打开酷狗登录页，点击「获取二维码」即可；无需外部 API 服务或升级 APK。
 
 `0.3.0` 使用 `/everyday/recommend`、`/personal/fm`、`/rank/audio?rankid=6666` 和 `/top/playlist`，
 将推荐的 `song_list` 与榜单的 `audio_info` / `album_info` 转换为标准歌曲；封面和播放所需专辑标识一并保留。

@@ -495,7 +495,8 @@ test('uses a quality ladder and serves a Range response through the loopback aud
 
 test('starts the embedded service lazily, memoizes it and closes it on deactivation', async () => {
   const harness = await startPlugin({
-    consent: { disclaimerVersion: CONSENT_VERSION }
+    consent: { disclaimerVersion: CONSENT_VERSION },
+    device: { platform: 'lite', cookies: { KUGOU_API_WEBGL: '12345678901234567890' } }
   })
   await withFetch(
     async (input) => {
@@ -532,6 +533,8 @@ test('starts the embedded service lazily, memoizes it and closes it on deactivat
       assert.ok(process.env.KUGOU_API_GUID)
       assert.ok(process.env.KUGOU_API_DEV)
       assert.ok(process.env.KUGOU_API_MAC)
+      assert.equal(device.webgl, '12345678901234567890')
+      assert.equal(process.env.KUGOU_API_WEBGL, device.webgl)
       assert.equal(process.env.KUGOU_API_PLATFORM, 'lite')
     }
   )

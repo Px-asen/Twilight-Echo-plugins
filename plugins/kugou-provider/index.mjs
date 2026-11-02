@@ -105,13 +105,32 @@ async function applyDeviceIdentity() {
         .padStart(2, '0')
     ).join(':')
   }
-  if (next.guid !== device.guid || next.dev !== device.dev || next.mac !== device.mac) {
+  // The upstream's synthetic WebGL identifier is an unsigned 64-bit decimal.
+  // Generate it without BigInt: Android's QuickJS build does not provide it.
+  if (!next.webgl) next.webgl = unsignedDecimal(randomBytes(8))
+  if (next.guid !== device.guid || next.dev !== device.dev || next.mac !== device.mac || next.webgl !== device.webgl) {
     await requireContext().settings.set(DEVICE_KEY, next)
   }
   process.env.KUGOU_API_GUID = next.guid
   process.env.KUGOU_API_DEV = next.dev
   process.env.KUGOU_API_MAC = next.mac
+  process.env.KUGOU_API_WEBGL = next.webgl
   process.env.KUGOU_API_PLATFORM = KUGOU_PLATFORM
+}
+
+function unsignedDecimal(bytes) {
+  let decimal = '0'
+  for (const byte of bytes) {
+    let carry = byte
+    let digits = ''
+    for (let i = decimal.length - 1; i >= 0; i--) {
+      carry += Number(decimal[i]) * 256
+      digits = String(carry % 10) + digits
+      carry = Math.floor(carry / 10)
+    }
+    decimal = (carry ? String(carry) : '') + digits
+  }
+  return decimal
 }
 
 const qrSessions = new Map()
@@ -880,7 +899,8 @@ async function readDevice() {
       cookies: {},
       guid: '',
       dev: '',
-      mac: ''
+      mac: '',
+      webgl: ''
     }
   }
   const samePlatform = raw.platform === KUGOU_PLATFORM
@@ -903,7 +923,8 @@ async function readDevice() {
     cookies,
     guid: typeof raw.guid === 'string' ? raw.guid.trim().slice(0, 128) : '',
     dev: typeof raw.dev === 'string' ? raw.dev.trim().slice(0, 64) : '',
-    mac: typeof raw.mac === 'string' ? raw.mac.trim().slice(0, 32) : ''
+    mac: typeof raw.mac === 'string' ? raw.mac.trim().slice(0, 32) : '',
+    webgl: firstString(raw.webgl, cookies.KUGOU_API_WEBGL).slice(0, 20)
   }
 }
 

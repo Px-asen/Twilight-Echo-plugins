@@ -219,7 +219,7 @@
     {
       "id": "com.twilightecho.provider.bilibili",
       "name": "Bilibili 收藏夹音源",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "description": "在流媒体页的 Bilibili 入口中搜索视频并播放收藏夹音频。支持搜索、多 P 展开、Cookie 静默刷新与 DASH 高音质播放。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -260,8 +260,8 @@
       },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.bilibili-0.2.0.tep",
-      "checksumSha256": "01e5702916d475422a66ebe523dfc6eace1c48f81459170cb46983673681d80f",
+      "sourceUrl": "packages/com.twilightecho.provider.bilibili-0.2.1.tep",
+      "checksumSha256": "5d3c18711645a130927b1e597cb65d74c1cca97c60c1cfa5336bd19ff00c9d57",
       "tags": [
         "provider",
         "ui",
@@ -272,7 +272,7 @@
     {
       "id": "com.twilightecho.provider.jellyfin",
       "name": "Jellyfin 音源",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "description": "连接自己的 Jellyfin 音乐服务器，搜索歌曲、浏览音乐库和歌单。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -302,8 +302,8 @@
         "userServer": true
       },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.jellyfin-0.2.0.tep",
-      "checksumSha256": "06e8d7baedfc578ceed949ad65f7dcc02eb3329a42452c6c3083f192511d8c2c",
+      "sourceUrl": "packages/com.twilightecho.provider.jellyfin-0.2.1.tep",
+      "checksumSha256": "236638a0de45f9ea8e4034f64a547b157eef758c62d56676aae2f0c317b9cb35",
       "tags": [
         "provider"
       ],
@@ -312,7 +312,7 @@
     {
       "id": "com.twilightecho.provider.kugou",
       "name": "酷狗音乐音源",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "description": "酷狗每日推荐、私人 FM、飙升榜与 Hi-Res 歌单，支持搜索、播放、歌词和扫码登录；API 服务内置并仅监听本机。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -358,8 +358,8 @@
       },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.kugou-0.4.0.tep",
-      "checksumSha256": "4b44386c8f615f5e3ffc9be016d6181327e4405c7507bb53eea2e3f1bc222385",
+      "sourceUrl": "packages/com.twilightecho.provider.kugou-0.4.1.tep",
+      "checksumSha256": "7891cc45bb760604ca67a2d5ca1d728bbc604f2e1dc957a5745a82f6cc82f2ae",
       "tags": [
         "provider",
         "ui",
@@ -370,7 +370,7 @@
     {
       "id": "com.twilightecho.provider.navidrome",
       "name": "Navidrome 音源",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "description": "连接 Navidrome 音乐服务器，提供搜索、播放、封面、歌词和歌单功能。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -400,8 +400,8 @@
       },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins/tree/main/plugins/navidrome-provider",
-      "sourceUrl": "packages/com.twilightecho.provider.navidrome-1.1.0.tep",
-      "checksumSha256": "2800b2b58e9b2ef1e43fa6d11d6fcc52ab75b7505f46760f071dae4d048eca54",
+      "sourceUrl": "packages/com.twilightecho.provider.navidrome-1.1.1.tep",
+      "checksumSha256": "dd5452a5b1f43e1d0092f3ef55296b9b465e5c40013709a94849f38ec68812fc",
       "tags": [
         "provider"
       ],
@@ -410,7 +410,7 @@
     {
       "id": "com.twilightecho.provider.qishui",
       "name": "汽水音乐音源",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "description": "汽水音乐原生 Provider：发现主页、推荐歌单、个人音乐库、搜索、封面、歌词与播放音源；支持宿主安全扫码登录。",
       "author": "OpenAI",
       "license": "Apache-2.0",
@@ -462,8 +462,8 @@
       },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.qishui-0.5.0.tep",
-      "checksumSha256": "95a30c7d02abd909564108ef486e980b9909339e7bf40bdf82a1f551a50a70e9",
+      "sourceUrl": "packages/com.twilightecho.provider.qishui-0.5.1.tep",
+      "checksumSha256": "08e1769ccfde372863a675f7c90dfafb969bcf6c7f724e9bac266154b765e535",
       "tags": [
         "provider",
         "ui"
@@ -473,7 +473,7 @@
     {
       "id": "com.twilightecho.provider.qqmusic",
       "name": "QQ 音乐音源",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "description": "QQ 音乐每日推荐、巅峰飙升榜、热歌榜与精选歌单，支持发现分类、搜索、歌词、原生扫码登录和用户歌单。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -516,8 +516,8 @@
       },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.qqmusic-0.4.0.tep",
-      "checksumSha256": "f73d8fcdbdcf8fce2c824d56ca4131c665609ff7ba38b6aedc40f39d046ff42d",
+      "sourceUrl": "packages/com.twilightecho.provider.qqmusic-0.4.1.tep",
+      "checksumSha256": "be75000ecba7f9ebd9196f9ab9c5bf5322bfd30f1a254e59c9006ccaa936ac00",
       "tags": [
         "provider",
         "ui",
@@ -528,7 +528,7 @@
     {
       "id": "com.twilightecho.provider.ytmusic",
       "name": "YouTube Music 音源",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "description": "在 Twilight Echo 流媒体区搜索和播放 YouTube Music 曲库。基于 ytmusicapi 解析逻辑重构，支持搜索、播放、歌词、歌单和用户媒体库。",
       "author": "Px-asen",
       "license": "Apache-2.0",
@@ -569,8 +569,8 @@
       },
       "repository": "https://github.com/Px-asen/Twilight-Echo-plugins",
       "homepage": "https://github.com/Px-asen/Twilight-Echo-plugins",
-      "sourceUrl": "packages/com.twilightecho.provider.ytmusic-1.1.0.tep",
-      "checksumSha256": "fb300a904639cb8841e55cdfbbd88d83b598b7fc3c18b090ce01ede11b647381",
+      "sourceUrl": "packages/com.twilightecho.provider.ytmusic-1.1.1.tep",
+      "checksumSha256": "bce55eb65a64565205b5a95db3ac1397d9ccd1341b803cfecbded5faff095b61",
       "tags": [
         "provider",
         "ui",

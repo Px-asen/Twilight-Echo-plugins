@@ -419,7 +419,7 @@ export function createHostEmulator({
 }
 
 // ── QuickJS-like context ───────────────────────────────────────────────────
-const QUICKJS_2020_MISSING = `
+const QUICKJS_2020_MISSING = String.raw`
   (function () {
     var typed = Object.getPrototypeOf(Uint8Array.prototype)
     ;[Array.prototype, String.prototype, typed].forEach(function (p) { delete p.at })
@@ -429,6 +429,28 @@ const QUICKJS_2020_MISSING = `
     delete Object.hasOwn; delete Object.groupBy; delete Map.groupBy; delete Array.fromAsync
     delete String.prototype.isWellFormed; delete String.prototype.toWellFormed
     delete Promise.withResolvers; delete Error.captureStackTrace
+    // V8 still honors prepareStackTrace after captureStackTrace is deleted.
+    // Eagerly materialize native stacks without it, as QuickJS does, so V8's
+    // CallSites cannot hide a broken SDK captureStackTrace implementation.
+    var NativeError = Error
+    function QuickJsError(message, options) {
+      var prepare = QuickJsError.prepareStackTrace
+      try {
+        delete QuickJsError.prepareStackTrace
+        var error = new NativeError(message, options)
+        var stack = String(error.stack).split('\n')
+        stack.splice(1, 1) // this constructor is not part of QuickJS stacks
+        Object.defineProperty(error, 'stack', { value: stack.join('\n'), writable: true, configurable: true })
+        return error
+      } finally {
+        if (prepare !== undefined) QuickJsError.prepareStackTrace = prepare
+      }
+    }
+    QuickJsError.prototype = NativeError.prototype
+    Object.defineProperty(QuickJsError, 'name', { value: 'Error' })
+    globalThis.Error = QuickJsError
+    // cash.quickjs is compiled without CONFIG_BIGNUM in the Android app.
+    delete globalThis.BigInt
     delete globalThis.WeakRef; delete globalThis.FinalizationRegistry; delete globalThis.Intl; delete globalThis.Iterator
     delete globalThis.SharedArrayBuffer; delete globalThis.Atomics; delete globalThis.WebAssembly
   })()
