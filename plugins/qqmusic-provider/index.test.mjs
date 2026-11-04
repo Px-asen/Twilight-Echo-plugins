@@ -112,7 +112,10 @@ function mqttConnack(reasonCode = 0, serverReference = '') {
   const properties = serverReference
     ? Buffer.concat([Buffer.from([0x1c]), mqttText(serverReference)])
     : Buffer.alloc(0)
-  return mqttPacket(0x20, Buffer.concat([Buffer.from([0, reasonCode, properties.length]), properties]))
+  return mqttPacket(
+    0x20,
+    Buffer.concat([Buffer.from([0, reasonCode, properties.length]), properties])
+  )
 }
 
 function mqttSuback(reasonCode = 0) {
@@ -320,7 +323,11 @@ test('registers the QQ provider and controlled settings contribution', async () 
     'fetchRecommendSongs',
     'fetchRecommendPlaylists',
     'fetchPlaylistCategories',
-    'fetchDiscoveryPlaylists'
+    'fetchDiscoveryPlaylists',
+    'fetchArtistTopSongs',
+    'fetchArtistAlbums',
+    'fetchArtistIntro',
+    'fetchAlbumTracks'
   ]) {
     assert.equal(typeof harness.provider.current[method], 'function')
   }
@@ -342,6 +349,14 @@ test('blocks all upstream work until the disclaimer is accepted', async () => {
         () => harness.provider.current.searchSongs('周杰伦'),
         /阅读并确认免责声明/
       )
+      for (const method of [
+        'fetchArtistTopSongs',
+        'fetchArtistAlbums',
+        'fetchArtistIntro',
+        'fetchAlbumTracks'
+      ]) {
+        await assert.rejects(() => harness.provider.current[method]('123'), /阅读并确认免责声明/)
+      }
       assert.equal(calls, 0)
       const form = await harness.handlers.get(SETTINGS_COMMAND)({
         source: 'settingsPanel',
@@ -427,6 +442,7 @@ test('maps QQ song search results to provider-prefixed tracks', async () => {
         artist: '周杰伦',
         artists: [{ id: '0025NhlN2yWrP4', name: '周杰伦' }],
         album: '叶惠美',
+        albumId: '002J4UUk29y8BY',
         filePath: 'qq:003rJSwm3TechU',
         fileName: '晴天.mp3',
         duration: 269,
@@ -443,11 +459,11 @@ test('maps QQ song search results to provider-prefixed tracks', async () => {
   )
 })
 
-test('maps playlist and artist search results through the shared QQ search endpoint', async () => {
+test('maps playlist search and uses the public Lite artist search with native singer IDs', async () => {
   const harness = await startPlugin({ disclaimer: { disclaimerVersion: CONSENT_VERSION } })
   let call = 0
   await withFetch(
-    async (input) => {
+    async (input, options) => {
       call += 1
       const url = new URL(String(input))
       if (url.searchParams.get('remoteplace') === 'txt.yqq.playlist') {
@@ -458,14 +474,39 @@ test('maps playlist and artist search results through the shared QQ search endpo
           }
         })
       }
+      assert.equal(url.hostname, 'u.y.qq.com')
+      assert.equal(options.headers.Cookie, undefined)
+      const body = JSON.parse(url.searchParams.get('data'))
+      assert.deepEqual(body.comm, { ct: 11, cv: 1003006 })
+      assert.equal(body.search.method, 'DoSearchForQQMusicLite')
+      assert.deepEqual(body.search.param, {
+        search_type: 1,
+        query: '歌手',
+        num_per_page: 10,
+        page_num: 2
+      })
       return jsonResponse({
         code: 0,
-        data: { singer: { totalnum: 1, list: [{ singerMid: 's1', singerName: '歌手 A' }] } }
+        search: {
+          code: 0,
+          data: {
+            body: {
+              singer: [
+                {
+                  singerMID: 's1',
+                  singerName: '歌手 A',
+                  singerPic: 'https://img.example/artist.jpg'
+                }
+              ]
+            },
+            meta: { sum: 11 }
+          }
+        }
       })
     },
     async () => {
       const playlists = await harness.provider.current.searchPlaylists('华语')
-      const artists = await harness.provider.current.searchArtists('歌手')
+      const artists = await harness.provider.current.searchArtists('歌手', 10, 10)
       assert.equal(call, 2)
       assert.deepEqual(playlists.items[0], {
         id: '42',
@@ -476,7 +517,187 @@ test('maps playlist and artist search results through the shared QQ search endpo
         owned: false,
         qqType: 0
       })
-      assert.deepEqual(artists.items[0], { id: 's1', name: '歌手 A', cover: null })
+      assert.deepEqual(artists.items[0], {
+        id: 's1',
+        name: '歌手 A',
+        cover: 'https://img.example/artist.jpg',
+        picUrl: 'https://img.example/artist.jpg'
+      })
+      assert.equal(artists.total, 11)
+    }
+  )
+})
+
+test('artist details load wrapped hot songs and a biography without requiring login', async () => {
+  const harness = await startPlugin({ disclaimer: { disclaimerVersion: CONSENT_VERSION } })
+  await withFetch(
+    async (input, options) => {
+      assert.equal(options.headers.Cookie, undefined)
+      const body = JSON.parse(new URL(input).searchParams.get('data'))
+      if (body.songs) {
+        assert.equal(body.songs.method, 'GetSingerSongList')
+        assert.deepEqual(body.songs.param, {
+          singerMid: 'singerMid',
+          singerID: 0,
+          begin: 0,
+          num: 50,
+          order: 1
+        })
+        return jsonResponse({
+          code: 0,
+          songs: {
+            code: 0,
+            data: {
+              songList: [
+                {},
+                {
+                  songInfo: {
+                    mid: 'songMid',
+                    id: 97773,
+                    title: '晴天',
+                    interval: 269,
+                    singer: [{ mid: 'singerMid', name: '周杰伦' }],
+                    album: { mid: 'albumMid', name: '叶惠美' },
+                    file: { media_mid: 'mediaMid' }
+                  }
+                }
+              ]
+            }
+          }
+        })
+      }
+      assert.equal(body.info.method, 'GetSingerDetail')
+      assert.deepEqual(body.info.param.singer_mids, ['singerMid'])
+      return jsonResponse({
+        code: 0,
+        info: { code: 0, data: { singer_list: [{ ex_info: { desc: ' 歌手简介 ' } }] } }
+      })
+    },
+    async () => {
+      const [songs, intro] = await Promise.all([
+        harness.provider.current.fetchArtistTopSongs('singerMid'),
+        harness.provider.current.fetchArtistIntro('singerMid')
+      ])
+      assert.equal(songs.length, 1)
+      assert.equal(songs[0].id, 'qq:songMid')
+      assert.equal(songs[0].title, '晴天')
+      assert.equal(songs[0].duration, 269)
+      assert.equal(songs[0].albumId, 'albumMid')
+      assert.equal(songs[0].providerSongId, '97773')
+      assert.equal(songs[0].providerMediaId, 'mediaMid')
+      assert.deepEqual(songs[0].artists, [{ id: 'singerMid', name: '周杰伦' }])
+      assert.equal(intro, '歌手简介')
+      assert.equal(harness.values.has('auth'), false)
+    }
+  )
+})
+
+test('artist albums and album tracks page by raw upstream counts past unavailable entries', async () => {
+  const harness = await startPlugin({ disclaimer: { disclaimerVersion: CONSENT_VERSION } })
+  const pages = []
+  await withFetch(
+    async (input) => {
+      const { page } = JSON.parse(new URL(input).searchParams.get('data'))
+      const { begin, num } = page.param
+      pages.push([page.method, begin])
+      const albums = page.method === 'GetAlbumList'
+      if (albums) {
+        assert.equal(page.param.singerMid, 'singerMid')
+        assert.equal(page.param.order, 0)
+      } else assert.equal(page.param.albumMid, 'albumMid')
+      const row = (i) =>
+        albums
+          ? {
+              albumMid: `album${i}`,
+              albumName: `专辑 ${i}`,
+              singerName: '歌手',
+              publishDate: '2003-07-31',
+              totalNum: 11,
+              albumType: '录音室专辑'
+            }
+          : { songInfo: { mid: `song${i}`, title: `歌曲 ${i}` } }
+      const list =
+        begin === 0 ? Array.from({ length: num }, (_, i) => (i === 0 ? {} : row(i))) : [row(begin)]
+      return jsonResponse({
+        code: 0,
+        page: {
+          code: 0,
+          data: {
+            [albums ? 'albumList' : 'songList']: list,
+            [albums ? 'total' : 'totalNum']: num + 1
+          }
+        }
+      })
+    },
+    async () => {
+      const albums = await harness.provider.current.fetchArtistAlbums('singerMid')
+      assert.equal(albums.length, 50)
+      assert.equal(albums.at(-1).id, 'album50')
+      assert.equal(albums[0].name, '专辑 1')
+      assert.equal(albums[0].trackCount, 11)
+      assert.equal(albums[0].publishTime, Date.parse('2003-07-31'))
+      assert.match(albums[0].cover, /T002R300x300M000album1\.jpg$/)
+      const tracks = await harness.provider.current.fetchAlbumTracks('albumMid')
+      assert.equal(tracks.length, 100)
+      assert.equal(tracks.at(-1).id, 'qq:song100')
+      assert.deepEqual(pages, [
+        ['GetAlbumList', 0],
+        ['GetAlbumList', 50],
+        ['GetAlbumSongList', 0],
+        ['GetAlbumSongList', 100]
+      ])
+    }
+  )
+})
+
+test('artist biographies resolve numeric IDs by MID rather than a name search', async () => {
+  const harness = await startPlugin({ disclaimer: { disclaimerVersion: CONSENT_VERSION } })
+  await withFetch(
+    async (input) => {
+      const body = JSON.parse(new URL(input).searchParams.get('data'))
+      if (body.songs) {
+        assert.equal(body.songs.param.singerID, 4558)
+        assert.equal(body.songs.param.num, 1)
+        return jsonResponse({ code: 0, songs: { code: 0, data: { singerMid: 'nativeMid' } } })
+      }
+      assert.deepEqual(body.info.param.singer_mids, ['nativeMid'])
+      return jsonResponse({
+        code: 0,
+        info: { code: 0, data: { singer_list: [{ ex_info: { desc: '简介' } }] } }
+      })
+    },
+    async () => assert.equal(await harness.provider.current.fetchArtistIntro(4558), '简介')
+  )
+})
+
+test('artist and album errors and cancellation propagate instead of becoming empty success', async () => {
+  const harness = await startPlugin({ disclaimer: { disclaimerVersion: CONSENT_VERSION } })
+  const controller = new AbortController()
+  controller.abort(new Error('artist request cancelled'))
+  await withFetch(
+    async (input) => {
+      const body = JSON.parse(new URL(input).searchParams.get('data'))
+      const key = Object.keys(body).find((key) => key !== 'comm')
+      return jsonResponse({ code: 0, [key]: { code: 104400 } })
+    },
+    async () => {
+      for (const method of [
+        'fetchArtistTopSongs',
+        'fetchArtistAlbums',
+        'fetchArtistIntro',
+        'fetchAlbumTracks'
+      ]) {
+        await assert.rejects(() => harness.provider.current[method]('nativeMid'), /业务错误 104400/)
+        await assert.rejects(
+          () => harness.provider.current[method]('nativeMid', { signal: controller.signal }),
+          /artist request cancelled/
+        )
+      }
+      await assert.rejects(() => harness.provider.current.fetchArtistTopSongs(''), /歌手 ID 无效/)
+      await assert.rejects(
+        () => harness.provider.current.fetchAlbumTracks('bad/id'),
+        /专辑 ID 无效/
+      )
     }
   )
 })
@@ -819,6 +1040,49 @@ test('loads a public discovered playlist without requiring QQ login', async () =
   )
 })
 
+test('official browser login validates and saves the account for existing library requests', async () => {
+  const harness = createHarness({ disclaimer: { disclaimerVersion: CONSENT_VERSION }, 'native-device': nativeDevice() })
+  let bridgeCalls = 0
+  harness.context.twilight.qqmusicAuth = { officialLogin: async () => {
+    bridgeCalls++
+    return { musicid: '123456', str_musicid: '123456', musickey: 'web-key', loginType: 2 }
+  } }
+  await activate(harness.context)
+  assert.equal(harness.provider.current.ui.loginExtraActions[0].primary, true)
+  await withFetch(async (_url, options) => {
+    const body = JSON.parse(options.body)
+    if (body.req_0.method === 'GetSession') return musicuResponse({ session: { uid: 'uid', sid: 'sid' } })
+    assert.equal(body.comm.tmeLoginType, 2)
+    assert.equal(body.comm.authst, 'web-key')
+    if (body.req_0.method === 'GetLoginUserInfo') return musicuResponse({ info: { nick: '网页用户' } })
+    assert.equal(body.req_0.method, 'GetPlaylistByUin')
+    return musicuResponse({ v_playlist: [] })
+  }, async () => {
+    assert.equal((await harness.provider.current.openOfficialLogin()).loggedIn, true)
+    assert.equal(harness.values.get('auth').credential.loginType, 2)
+    assert.equal((await harness.provider.current.fetchUserLibrary()).likedPlaylist.id, 'liked')
+    assert.equal(bridgeCalls, 1)
+  })
+})
+
+test('a canceled or invalid official login never replaces the saved account', async () => {
+  const initial = nativeAuth()
+  const harness = createHarness({ disclaimer: { disclaimerVersion: CONSENT_VERSION }, auth: initial })
+  let complete
+  harness.context.twilight.qqmusicAuth = { officialLogin: () => new Promise(resolve => { complete = resolve }) }
+  await activate(harness.context)
+  const controller = new AbortController()
+  const pending = harness.provider.current.openOfficialLogin({ signal: controller.signal })
+  await flushAsync()
+  controller.abort()
+  complete({ musicid: '123', musickey: 'unused', loginType: 2 })
+  await assert.rejects(pending, { name: 'AbortError' })
+  assert.equal(harness.values.get('auth'), initial)
+  harness.context.twilight.qqmusicAuth.officialLogin = async () => ({})
+  await assert.rejects(harness.provider.current.openOfficialLogin(), /未返回有效会话/)
+  assert.equal(harness.values.get('auth'), initial)
+})
+
 test('performs QQ Music native QR login and persists only a private auth session', async () => {
   const harness = await startPlugin({ disclaimer: { disclaimerVersion: CONSENT_VERSION } })
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
@@ -915,6 +1179,49 @@ test('performs QQ Music native QR login and persists only a private auth session
   })
 })
 
+test('preserves QQ Music app account IDs and the reported account type through login', async () => {
+  const uin = '1152921504606846977'
+  for (const returnedLoginType of [undefined, 1, 6]) {
+    const harness = await startPlugin({
+      disclaimer: { disclaimerVersion: CONSENT_VERSION },
+      'native-device': nativeDevice()
+    })
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    resetFakeMqtt({ events: [mqttQrEvent('app-qr', 'cookies', { cookies: {
+      qqmusic_uin: { value: uin },
+      qqmusic_key: { value: 'app-ticket' },
+      tmeLoginType: { value: '1' }
+    } })] })
+    await withWebSocket(FakeMqttWebSocket, () => withFetch(async (input, options) => {
+      const body = JSON.parse(options.body)
+      if (body.req_0.method === 'Login') {
+        assert.match(options.body, new RegExp(`"musicid":${uin}[,}]`))
+        assert.equal(body.comm.tmeLoginType, 6, 'exchange always uses the QR transport type')
+        return musicuResponse({
+          musicid: Number(uin), musickey: 'app-key',
+          ...(returnedLoginType === 1 ? {} : { str_musicid: uin }),
+          ...(returnedLoginType === undefined ? {} : { loginType: returnedLoginType })
+        })
+      }
+      if (body.req_0.method === 'GetLoginUserInfo') {
+        assert.equal(body.comm.qq, uin)
+        assert.equal(body.comm.tmeLoginType, returnedLoginType ?? 1)
+        assert.match(options.headers.Cookie, new RegExp(`qqmusic_uin=${uin};`))
+        return musicuResponse({ info: { nick: 'App 用户' } })
+      }
+      return nativeQrFetch('app-qr', png)(input, options)
+    }, async () => {
+      const qr = await harness.provider.current.getQrLogin()
+      await flushAsync()
+      assert.equal((await harness.provider.current.checkQrLogin(qr.key)).code, 0)
+      assert.equal(harness.values.get('auth').credential.str_musicid, uin)
+      assert.equal(harness.values.get('auth').credential.loginType, returnedLoginType ?? 1)
+      assert.equal((await harness.provider.current.checkLogin()).profile.userId, uin)
+    }))
+    await deactivate()
+  }
+})
+
 test('reports invalid native QR credentials instead of waiting forever', async () => {
   const harness = await startPlugin({
     disclaimer: { disclaimerVersion: CONSENT_VERSION },
@@ -948,6 +1255,23 @@ test('reports invalid native QR credentials instead of waiting forever', async (
   })
 })
 
+test('shows a phone-side login rejection as a failure rather than an expired QR', async () => {
+  const harness = await startPlugin({
+    disclaimer: { disclaimerVersion: CONSENT_VERSION },
+    'native-device': nativeDevice()
+  })
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  resetFakeMqtt({ events: [mqttQrEvent('rejected-qr', 'loginFailed', {})] })
+  await withWebSocket(FakeMqttWebSocket, () => withFetch(nativeQrFetch('rejected-qr', png), async () => {
+    const qr = await harness.provider.current.getQrLogin()
+    await flushAsync()
+    const result = await harness.provider.current.checkQrLogin(qr.key)
+    assert.equal(result.code, 502)
+    assert.match(result.message, /手机端提示/)
+    assert.equal(harness.values.has('auth'), false)
+  }))
+})
+
 test('reports native QR connection failures before a user scans', async () => {
   const harness = await startPlugin({
     disclaimer: { disclaimerVersion: CONSENT_VERSION },
@@ -970,10 +1294,7 @@ test('follows the QQ MQTT broker redirect on the handshake path', async () => {
   })
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
   resetFakeMqtt({
-    urls: [
-      'wss://mu.y.qq.com/ws/handshake',
-      'wss://mu.y.qq.com/ws/handshake/11.168.56.187:29001'
-    ],
+    urls: ['wss://mu.y.qq.com/ws/handshake', 'wss://mu.y.qq.com/ws/handshake/11.168.56.187:29001'],
     connackCodes: [0x9d, 0],
     serverReference: '11.168.56.187:29001'
   })

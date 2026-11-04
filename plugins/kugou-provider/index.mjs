@@ -108,7 +108,12 @@ async function applyDeviceIdentity() {
   // The upstream's synthetic WebGL identifier is an unsigned 64-bit decimal.
   // Generate it without BigInt: Android's QuickJS build does not provide it.
   if (!next.webgl) next.webgl = unsignedDecimal(randomBytes(8))
-  if (next.guid !== device.guid || next.dev !== device.dev || next.mac !== device.mac || next.webgl !== device.webgl) {
+  if (
+    next.guid !== device.guid ||
+    next.dev !== device.dev ||
+    next.mac !== device.mac ||
+    next.webgl !== device.webgl
+  ) {
     await requireContext().settings.set(DEVICE_KEY, next)
   }
   process.env.KUGOU_API_GUID = next.guid
@@ -192,6 +197,10 @@ export async function activate(context) {
     searchSongs,
     searchPlaylists,
     searchArtists,
+    fetchArtistTopSongs,
+    fetchArtistAlbums,
+    fetchArtistIntro,
+    fetchAlbumTracks,
     fetchRecommendSongs,
     fetchPersonalFm,
     fetchRecommendPlaylists,
@@ -354,6 +363,76 @@ async function searchArtists(keywords, limit = 30, offset = 0, requestContext) {
   )
   const items = extractArtistItems(payload).map(mapKugouArtist).filter(Boolean)
   return { items, total: extractTotal(payload, items.length) }
+}
+
+function normalizeKugouEntityId(value, kind) {
+  const id = String(value ?? '').trim()
+  if (!/^[1-9]\d*$/.test(id)) throw new Error(`酷狗${kind} ID 无效`)
+  return id
+}
+
+async function fetchArtistTopSongs(artistId, requestContext) {
+  await assertConsent()
+  const payload = await adapterRequest(
+    '/artist/audios/new',
+    { id: normalizeKugouEntityId(artistId, '歌手'), sort: 'hot', page: 1, pagesize: 50 },
+    { signal: requestSignal(requestContext) }
+  )
+  return extractTrackItems(payload).map(mapKugouTrack).filter(Boolean)
+}
+
+async function fetchArtistAlbums(artistId, requestContext) {
+  await assertConsent()
+  const items = await fetchAdapterPages(
+    '/artist/albums',
+    { id: normalizeKugouEntityId(artistId, '歌手'), sort: 'new' },
+    (payload) => firstArray(payload?.data),
+    requestContext
+  )
+  return items.map(mapKugouAlbum).filter(Boolean)
+}
+
+async function fetchArtistIntro(artistId, requestContext) {
+  await assertConsent()
+  const payload = await adapterRequest(
+    '/artist/detail',
+    { id: normalizeKugouEntityId(artistId, '歌手') },
+    { signal: requestSignal(requestContext) }
+  )
+  return firstString(payload?.data?.intro)
+}
+
+async function fetchAlbumTracks(albumId, requestContext) {
+  await assertConsent()
+  const items = await fetchAdapterPages(
+    '/album/songs',
+    { id: normalizeKugouEntityId(albumId, '专辑') },
+    extractTrackItems,
+    requestContext
+  )
+  return items.map(mapKugouTrack).filter(Boolean)
+}
+
+async function fetchAdapterPages(pathname, params, getItems, requestContext) {
+  const items = []
+  for (let page = 1; ; page += 1) {
+    const payload = await adapterRequest(
+      pathname,
+      { ...params, page, pagesize: MAX_PAGE_SIZE },
+      { signal: requestSignal(requestContext) }
+    )
+    const batch = getItems(payload)
+    items.push(...batch)
+    const total = extractTotal(payload, 0)
+    if (
+      !batch.length ||
+      (total > 0
+        ? (page - 1) * MAX_PAGE_SIZE + batch.length >= total
+        : batch.length < MAX_PAGE_SIZE)
+    )
+      break
+  }
+  return items
 }
 
 async function publicSearchRequest(type, keywords, page, pageSize, signal) {
@@ -1103,17 +1182,22 @@ function extractTotal(payload, fallback) {
 
 export function mapKugouTrack(item) {
   if (!item || typeof item !== 'object') return null
+  // Artist and album endpoints put track metadata under base/audio_info;
+  // search, recommendations and playlists retain their existing flat shapes.
+  if (item.base && typeof item.base === 'object') item = { ...item.base, ...item }
   const hash = firstString(
     item.hash,
     item.FileHash,
     item.filehash,
     item.audio_hash,
-    item.audio_info?.hash_128
+    item.audio_info?.hash_128,
+    item.audio_info?.hash
   ).toUpperCase()
   if (!hash) return null
   const rawName = firstString(
     item.songname,
     item.song_name,
+    item.audio_name,
     item.filename,
     item.FileName,
     item.name
@@ -1123,15 +1207,26 @@ export function mapKugouTrack(item) {
       item.songname,
       item.SongName,
       item.song_name,
+      item.audio_name,
       splitFileName(rawName).title,
       '未知歌曲'
     )
   )
+  const artistRefs = firstArray(item.authors, item.singerinfo)
+    .map((entry) => {
+      const author = entry?.base || entry
+      const name = stripSearchTags(
+        firstString(author?.author_name, author?.name, author?.singername)
+      )
+      const id = firstString(author?.author_id, author?.id, author?.singerid)
+      return name ? { name, ...(id ? { id } : {}) } : null
+    })
+    .filter(Boolean)
   const artist =
     stripSearchTags(
       firstString(item.singername, item.SingerName, item.singer_name, item.author_name, item.author)
     ) ||
-    singersFromSingerInfo(item.singerinfo) ||
+    artistRefs.map((entry) => entry.name).join('/') ||
     stripSearchTags(splitFileName(rawName).artist) ||
     '未知艺术家'
   const album = stripSearchTags(
@@ -1157,7 +1252,7 @@ export function mapKugouTrack(item) {
     id,
     title,
     artist,
-    artists: splitArtists(artist),
+    artists: artistRefs.length ? artistRefs : splitArtists(artist),
     album,
     filePath: id,
     fileName: sanitizeFileName(title) + '.mp3',
@@ -1167,7 +1262,9 @@ export function mapKugouTrack(item) {
       item.timelen,
       item.Duration,
       item.time_length,
-      item.audio_info?.duration_128
+      item.audio_info?.duration_128,
+      item.audio_info?.duration,
+      item.audio_info?.timelength
     ),
     size: normalizeCount(
       item.filesize,
@@ -1176,6 +1273,7 @@ export function mapKugouTrack(item) {
       item.filesize_128,
       item.file_size,
       item.audio_info?.filesize_128,
+      item.audio_info?.filesize,
       item.FileSize
     ),
     cover: normalizeCover(
@@ -1185,6 +1283,7 @@ export function mapKugouTrack(item) {
         item.album_sizable_cover,
         item.sizable_cover,
         item.album_info?.sizable_cover,
+        item.album_info?.cover,
         item.trans_param?.union_cover,
         item.image,
         item.Image,
@@ -1197,17 +1296,9 @@ export function mapKugouTrack(item) {
     streamUrl: null,
     bpm: undefined,
     providerSongId: hash,
-    ...(providerAlbumId ? { providerAlbumId } : {}),
+    ...(providerAlbumId ? { providerAlbumId, albumId: providerAlbumId } : {}),
     ...(providerAlbumAudioId ? { providerAlbumAudioId } : {})
   }
-}
-
-function singersFromSingerInfo(value) {
-  if (!Array.isArray(value)) return ''
-  const names = value
-    .map((entry) => firstString(entry?.name, entry?.singername, entry?.author_name))
-    .filter(Boolean)
-  return names.join('/')
 }
 
 function mapKugouPlaylist(item) {
@@ -1250,10 +1341,32 @@ function mapKugouArtist(item) {
     firstString(item.singername, item.author_name, item.name, item.title)
   )
   if (!id || !name) return null
+  const cover =
+    normalizeCover(
+      firstString(item.imgurl, item.sizable_avatar, item.avatar, item.cover, item.image)
+    ) || null
   return {
     id,
     name,
-    cover: normalizeCover(firstString(item.imgurl, item.avatar, item.cover, item.image)) || null
+    cover,
+    picUrl: cover
+  }
+}
+
+function mapKugouAlbum(item) {
+  if (!item || typeof item !== 'object') return null
+  const id = firstString(item.album_id)
+  const name = firstString(item.album_name)
+  if (!id || !name) return null
+  const publishTime = Date.parse(item.publish_date)
+  return {
+    id,
+    name,
+    artist: firstString(item.author_name),
+    cover: normalizeCover(firstString(item.sizable_cover)) || null,
+    trackCount: normalizeCount(item.song_count),
+    ...(Number.isFinite(publishTime) ? { publishTime } : {}),
+    releaseType: firstString(item.type)
   }
 }
 

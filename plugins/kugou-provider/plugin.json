@@ -1,8 +1,8 @@
 {
   "id": "com.twilightecho.provider.kugou",
   "name": "酷狗音乐音源",
-  "version": "0.4.1",
-  "description": "酷狗每日推荐、私人 FM、飙升榜与 Hi-Res 歌单，支持搜索、播放、歌词和扫码登录；API 服务内置并仅监听本机。",
+  "version": "0.4.2",
+  "description": "酷狗每日推荐、私人 FM、飙升榜与 Hi-Res 歌单，支持歌手主页、专辑、搜索、播放、歌词和扫码登录；API 服务内置并仅监听本机。",
   "author": "Px-asen",
   "license": "Apache-2.0",
   "type": ["provider", "ui"],

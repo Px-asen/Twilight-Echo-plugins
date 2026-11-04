@@ -32,7 +32,7 @@ SOFTWARE.
 
 ## `yakult-green-tea/qq-music-api`
 
-The QQ Music native QR creation and MQTT status compatibility layer in this plugin is an independent, dependency-free adaptation of the public service behavior and implementation patterns from [yakult-green-tea/qq-music-api](https://github.com/yakult-green-tea/qq-music-api). No upstream package or remote code is loaded at runtime.
+The QQ Music native QR creation, MQTT status, account-type handling and exact-integer credential exchange in this plugin are independent, dependency-free adaptations of the public service behavior and implementation patterns from [yakult-green-tea/qq-music-api](https://github.com/yakult-green-tea/qq-music-api). No upstream package or remote code is loaded at runtime.
 
 The upstream project is distributed under the MIT License:
 

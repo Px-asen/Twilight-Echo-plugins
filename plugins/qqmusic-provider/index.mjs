@@ -59,6 +59,7 @@ let proxyServerStart = null
 let proxyPort = 0
 let loginCache = null
 let nativeDevicePreparation = null
+let officialLoginGeneration = 0
 
 const qrSessions = new Map()
 const streamTokens = new Map()
@@ -85,7 +86,9 @@ const QUALITY_CHOICES = [
 
 function normalizeQualityChoice(value) {
   const normalized = String(value || '').toLowerCase()
-  return QUALITY_CHOICES.some((choice) => choice.value === normalized) ? normalized : DEFAULT_QUALITY
+  return QUALITY_CHOICES.some((choice) => choice.value === normalized)
+    ? normalized
+    : DEFAULT_QUALITY
 }
 
 function qualityLabel(value) {
@@ -114,8 +117,14 @@ export async function activate(context) {
       color: '#31c27c',
       description: 'QQ 音乐曲库',
       authType: 'qr',
-      loginInstructions: '请先在设置中确认免责声明，再使用 QQ 音乐二维码登录',
+      loginInstructions: '请先在设置中确认免责声明，再使用 QQ 音乐 App 或手机 QQ 扫码并确认登录',
       qrStatusCodes: { waiting: 66, scanned: 67, expired: 65, success: 0 },
+      ...(context.twilight.qqmusicAuth?.officialLogin ? {
+        loginExtraActions: [{
+          label: '使用官方网页登录', icon: 'pi pi-external-link',
+          method: 'openOfficialLogin', primary: true
+        }]
+      } : {}),
       streamingHome: { requiresLogin: false, subtitle: '每天，都有懂你的好音乐。' },
       streamingSections: [
         {
@@ -154,6 +163,10 @@ export async function activate(context) {
     searchSongs,
     searchPlaylists,
     searchArtists,
+    fetchArtistTopSongs,
+    fetchArtistAlbums,
+    fetchArtistIntro,
+    fetchAlbumTracks,
     fetchRecommendSongs,
     fetchRecommendPlaylists,
     fetchPlaylistCategories,
@@ -165,6 +178,7 @@ export async function activate(context) {
     checkLogin,
     getProfile,
     logout,
+    ...(context.twilight.qqmusicAuth?.officialLogin ? { openOfficialLogin } : {}),
     getQrLogin,
     checkQrLogin
   })
@@ -180,6 +194,7 @@ export async function activate(context) {
 }
 
 export async function deactivate() {
+  officialLoginGeneration += 1
   clearQrSessions()
   streamTokens.clear()
   playlistCache.clear()
@@ -279,6 +294,7 @@ async function getProfile() {
 }
 
 async function logout() {
+  officialLoginGeneration += 1
   const context = requireContext()
   clearQrSessions()
   await context.settings.delete(AUTH_KEY)
@@ -289,7 +305,40 @@ async function logout() {
   playlistCache.clear()
 }
 
+async function openOfficialLogin(requestContext) {
+  await assertConsent()
+  const context = requireContext()
+  const generation = ++officialLoginGeneration
+  clearQrSessions()
+  const credential = normalizeNativeCredential(
+    await context.twilight.qqmusicAuth.officialLogin({ signal: requestSignal(requestContext) })
+  )
+  if (context !== pluginContext || generation !== officialLoginGeneration || requestSignal(requestContext)?.aborted) {
+    throw abortError()
+  }
+  if (!credential) throw new Error('QQ 音乐官方登录未返回有效会话')
+  const device = await prepareNativeDevice(requestContext)
+  const data = await callNativeMusicu(
+    'music.UserInfo.userInfoServer', 'GetLoginUserInfo', {},
+    { device, credential, requestContext }
+  )
+  if (context !== pluginContext || generation !== officialLoginGeneration || requestSignal(requestContext)?.aborted) {
+    throw abortError()
+  }
+  const profile = mapNativeProfile(data, credential.musicid)
+  await context.settings.set(AUTH_KEY, {
+    version: 2, uin: credential.musicid, credential, profile,
+    updatedAt: new Date().toISOString()
+  })
+  playlistCache.clear()
+  streamTokens.clear()
+  loginCache = { cookie: buildNativeAuthCookie(credential.musicid, credential.musickey), profile,
+    expiresAt: Date.now() + LOGIN_CACHE_TTL_MS }
+  return { loggedIn: true, profile }
+}
+
 async function getQrLogin(requestContext) {
+  officialLoginGeneration += 1
   await assertConsent()
   clearQrSessions()
   const qr = await createNativeQr(requestContext)
@@ -441,7 +490,7 @@ async function callNativeMusicu(module, method, param, options = {}) {
     {
       method: 'POST',
       headers,
-      body: JSON.stringify({
+      body: serializeNativeMusicu({
         comm: buildNativeComm(device, credential, options.commOverrides),
         req_0: {
           module,
@@ -473,6 +522,21 @@ async function callNativeMusicu(module, method, param, options = {}) {
     throw new Error(`QQ 音乐业务错误 ${Number.isFinite(code) ? code : '未知'}`)
   }
   return item.data && typeof item.data === 'object' ? item.data : {}
+}
+
+// Music IDs from WeChat-linked accounts exceed Number.MAX_SAFE_INTEGER. The
+// Login RPC requires a JSON integer, so retain its decimal digits on the wire.
+class NativeLoginId {
+  constructor(value) {
+    if (!/^[0-9]{1,20}$/.test(value)) throw new Error('QQ 音乐账号 ID 无效')
+    this.digits = value.replace(/^0+(?=\d)/, '')
+  }
+}
+
+function serializeNativeMusicu(value) {
+  return JSON.stringify(value, (_key, entry) =>
+    entry instanceof NativeLoginId ? `\u0000qqmusic-id:${entry.digits}` : entry
+  ).replace(/"\\u0000qqmusic-id:([0-9]+)"/g, '$1')
 }
 
 function buildNativeComm(device, credential, overrides = {}) {
@@ -932,9 +996,13 @@ function handleNativeQrEvent(key, event) {
       .catch((error) => handleNativeQrExchangeFailure(key, error))
     return
   }
-  if (
-    ['expired', 'timeout', 'cancel', 'canceled', 'failed', 'loginfailed', 'error'].includes(type)
-  ) {
+  if (['failed', 'loginfailed', 'error'].includes(type)) {
+    session.state = 'failed'
+    session.errorMessage = 'QQ 音乐客户端未批准本次登录，请查看手机端提示后重新扫码'
+    session.listener?.close()
+    return
+  }
+  if (['expired', 'timeout', 'cancel', 'canceled'].includes(type)) {
     session.state = 'expired'
     session.listener?.close()
   }
@@ -946,7 +1014,7 @@ async function completeNativeQrLogin(session, payload) {
     'music.login.LoginServer',
     'Login',
     {
-      musicid: Number(credentials.uin),
+      musicid: new NativeLoginId(credentials.uin),
       qrCodeID: session.qrcodeId,
       token: credentials.musicKey
     },
@@ -956,11 +1024,9 @@ async function completeNativeQrLogin(session, payload) {
     }
   )
   const credential = normalizeNativeCredential({
-    musicid:
-      findNestedValue(exchanged, ['musicid', 'str_musicid', 'uin', 'qqmusic_uin']) ||
-      credentials.uin,
+    musicid: findNestedValue(exchanged, ['str_musicid']) || credentials.uin,
     musickey: findNestedValue(exchanged, ['musickey', 'qqmusic_key', 'qm_keyst']),
-    loginType: findNestedValue(exchanged, ['loginType', 'tmeLoginType']) || 6,
+    loginType: findNestedValue(exchanged, ['loginType', 'tmeLoginType']) || credentials.loginType,
     encryptUin: findNestedValue(exchanged, ['encryptUin', 'encrypt_uin'])
   })
   if (!credential) throw new Error('QQ 音乐扫码未建立有效登录会话')
@@ -1001,8 +1067,13 @@ function extractNativeQrCredentials(payload) {
     nativeCredentialValue(cookies.qm_keyst) ||
     nativeCredentialValue(source.qqmusic_key) ||
     nativeCredentialValue(source.qm_keyst)
+  const loginType = Number(
+    nativeCredentialValue(cookies.tmeLoginType) ||
+    nativeCredentialValue(source.tmeLoginType) ||
+    nativeCredentialValue(source.loginType) || 6
+  )
   if (!uin || !musicKey) throw new Error('QQ 音乐扫码返回的登录凭据无效')
-  return { uin, musicKey }
+  return { uin, musicKey, loginType: loginType === 1 ? 1 : 6 }
 }
 
 function nativeCredentialValue(value) {
@@ -1386,31 +1457,132 @@ async function searchPlaylists(keywords, limit = 30, offset = 0, requestContext)
 
 async function searchArtists(keywords, limit = 30, offset = 0, requestContext) {
   await assertConsent()
+  const query = String(keywords || '').trim()
+  if (!query) return { items: [], total: 0 }
   const pageSize = normalizeLimit(limit)
   const page = Math.floor(Math.max(0, Number(offset) || 0) / pageSize) + 1
-  const payload = await fetchJson(
-    buildUrl('https://c.y.qq.com', '/soso/fcgi-bin/client_search_cp', {
-      format: 'json',
-      outCharset: 'utf-8',
-      ct: 24,
-      remoteplace: 'txt.yqq.singer',
-      t: 0,
-      aggr: 1,
-      cr: 1,
-      platform: 'yqq.json',
-      w: String(keywords || '').trim(),
-      n: pageSize,
-      p: page
-    }),
-    { signal: requestSignal(requestContext) },
+  // The legacy song-search endpoint ignores the singer routing hint. The
+  // public Lite search returns singer identities and portraits with ct=11.
+  const payload = await fetchPublicMusicu(
+    {
+      search: {
+        module: 'music.search.SearchCgiService',
+        method: 'DoSearchForQQMusicLite',
+        param: { search_type: 1, query, num_per_page: pageSize, page_num: page }
+      }
+    },
+    requestContext,
+    { ct: 11, cv: 1003006 }
+  )
+  const data = publicMusicuData(payload, 'search')
+  return {
+    items: firstArray(data.body?.singer).map(mapArtist).filter(Boolean),
+    total: normalizeCount(data.meta?.sum)
+  }
+}
+
+function musicuEntityId(value, kind) {
+  const id = String(value ?? '').trim()
+  if (!/^[A-Za-z0-9]+$/.test(id)) throw new Error(`QQ 音乐${kind} ID 无效`)
+  return /^\d+$/.test(id) ? { mid: '', id: Number(id) } : { mid: id, id: 0 }
+}
+
+async function fetchArtistTopSongs(artistId, requestContext) {
+  await assertConsent()
+  const singer = musicuEntityId(artistId, '歌手')
+  const payload = await fetchPublicMusicu(
+    {
+      songs: {
+        module: 'music.musichallSong.SongListInter',
+        method: 'GetSingerSongList',
+        param: { singerMid: singer.mid, singerID: singer.id, begin: 0, num: 50, order: 1 }
+      }
+    },
     requestContext
   )
-  const singerData = payload?.data?.singer || payload?.data?.zhida || payload?.singer || {}
-  const rawItems = firstArray(singerData.list, singerData.singerlist)
-  return {
-    items: rawItems.map(mapArtist).filter(Boolean),
-    total: normalizeCount(singerData.totalnum ?? singerData.total)
+  return firstArray(publicMusicuData(payload, 'songs').songList)
+    .map((item) => mapTrack(item.songInfo))
+    .filter(Boolean)
+}
+
+async function fetchArtistAlbums(artistId, requestContext) {
+  await assertConsent()
+  const singer = musicuEntityId(artistId, '歌手')
+  const items = await fetchPublicMusicuPages(
+    {
+      module: 'music.musichallAlbum.AlbumListServer',
+      method: 'GetAlbumList',
+      param: { singerMid: singer.mid, singerID: singer.id, num: 50, order: 0 }
+    },
+    'albumList',
+    'total',
+    requestContext
+  )
+  return items.map(mapAlbum).filter(Boolean)
+}
+
+async function fetchArtistIntro(artistId, requestContext) {
+  await assertConsent()
+  const singer = musicuEntityId(artistId, '歌手')
+  let mid = singer.mid
+  if (!mid) {
+    // Numeric artist references occur in older tracks. Resolve their MID using
+    // the native ID endpoint, rather than guessing an identity by name.
+    const payload = await fetchPublicMusicu(
+      {
+        songs: {
+          module: 'music.musichallSong.SongListInter',
+          method: 'GetSingerSongList',
+          param: { singerID: singer.id, singerMid: '', begin: 0, num: 1, order: 1 }
+        }
+      },
+      requestContext
+    )
+    mid = publicMusicuData(payload, 'songs').singerMid
+    if (!mid) return ''
   }
+  const payload = await fetchPublicMusicu(
+    {
+      info: {
+        module: 'music.musichallSinger.SingerInfoInter',
+        method: 'GetSingerDetail',
+        param: { singer_mids: [mid], wiki_singer: 0, ex_singer: 1 }
+      }
+    },
+    requestContext
+  )
+  return String(publicMusicuData(payload, 'info').singer_list?.[0]?.ex_info?.desc || '').trim()
+}
+
+async function fetchAlbumTracks(albumId, requestContext) {
+  await assertConsent()
+  const album = musicuEntityId(albumId, '专辑')
+  const items = await fetchPublicMusicuPages(
+    {
+      module: 'music.musichallAlbum.AlbumSongList',
+      method: 'GetAlbumSongList',
+      param: { albumMid: album.mid, albumID: album.id, num: 100, order: 2 }
+    },
+    'songList',
+    'totalNum',
+    requestContext
+  )
+  return items.map((item) => mapTrack(item.songInfo)).filter(Boolean)
+}
+
+async function fetchPublicMusicuPages(request, listKey, totalKey, requestContext) {
+  const items = []
+  for (let begin = 0; ; begin += request.param.num) {
+    const payload = await fetchPublicMusicu(
+      { page: { ...request, param: { ...request.param, begin } } },
+      requestContext
+    )
+    const data = publicMusicuData(payload, 'page')
+    const page = firstArray(data[listKey])
+    items.push(...page)
+    if (!page.length || begin + page.length >= normalizeCount(data[totalKey])) break
+  }
+  return items
 }
 
 async function fetchRecommendSongs(section = 'daily', requestContext) {
@@ -1579,11 +1751,11 @@ async function fetchDiscoveryPlaylists(
   }
 }
 
-async function fetchPublicMusicu(requests, requestContext) {
+async function fetchPublicMusicu(requests, requestContext, comm = { ct: 24 }) {
   return fetchJson(
     buildUrl('https://u.y.qq.com', '/cgi-bin/musicu.fcg', {
       format: 'json',
-      data: JSON.stringify({ comm: { ct: 24 }, ...requests })
+      data: JSON.stringify({ comm, ...requests })
     }),
     {
       headers: { Referer: QQ_MUSICU_REFERER },
@@ -1914,7 +2086,8 @@ async function getPlaybackUrl(track, options = {}, requestContext) {
   if (!songmid) return null
   const mediaMid = trackMediaMid(track) || songmid
   const ownQuality = await readOwnQuality()
-  const hostQuality = typeof options?.quality === 'string' ? options.quality.trim().toLowerCase() : ''
+  const hostQuality =
+    typeof options?.quality === 'string' ? options.quality.trim().toLowerCase() : ''
   // When the user has not chosen explicitly, honour a concrete host-supplied
   // level (e.g. a future generic streaming-quality setting) if there is one.
   const effective =
@@ -2199,7 +2372,7 @@ async function clearRejectedNativeAuth(credential) {
 
 function normalizeNativeCredential(value) {
   if (!value || typeof value !== 'object') return null
-  const musicid = normalizeUin(value.musicid || value.str_musicid || value.uin)
+  const musicid = normalizeUin(value.str_musicid || value.musicid || value.uin)
   const musickey = nativeCredentialValue(value.musickey || value.qqmusic_key || value.qm_keyst)
   if (!musicid || !musickey || /[;\r\n]/.test(musickey)) return null
   const requestedLoginType = Number(value.loginType || value.tmeLoginType || 6)
@@ -2399,6 +2572,7 @@ function mapTrack(item) {
     artist,
     artists: artists.length ? artists : undefined,
     album: albumName,
+    ...(albumMid ? { albumId: albumMid } : {}),
     filePath: id,
     fileName: `${sanitizeFileName(title)}.mp3`,
     duration: normalizeDuration(item.interval || item.duration),
@@ -2503,13 +2677,35 @@ function mapPlaylist(item, fallbackCreator, viewerUin) {
 
 function mapArtist(item) {
   if (!item || typeof item !== 'object') return null
-  const id = String(item.singerMid || item.singermid || item.mid || item.id || '').trim()
+  const id = String(
+    item.singerMID || item.singerMid || item.singermid || item.mid || item.id || ''
+  ).trim()
   const name = String(item.singerName || item.singername || item.name || item.title || '').trim()
   if (!id || !name) return null
+  const cover =
+    normalizeHttpUrl(item.singerPic || item.pic || item.picurl || item.avatar || '') || null
   return {
     id,
     name,
-    cover: normalizeHttpUrl(item.pic || item.picurl || item.avatar || '') || null
+    cover,
+    picUrl: cover
+  }
+}
+
+function mapAlbum(item) {
+  if (!item || typeof item !== 'object') return null
+  const id = String(item.albumMid || item.albumID || '').trim()
+  const name = String(item.albumName || '').trim()
+  if (!id || !name) return null
+  const publishTime = Date.parse(item.publishDate)
+  return {
+    id,
+    name,
+    artist: String(item.singerName || '').trim(),
+    cover: item.albumMid ? albumCover(item.albumMid) : null,
+    trackCount: normalizeCount(item.totalNum),
+    ...(Number.isFinite(publishTime) ? { publishTime } : {}),
+    releaseType: String(item.albumType || '').trim()
   }
 }
 

@@ -89,6 +89,15 @@ test('registers the KuGou provider and blocks all upstream work before consent',
         () => harness.provider.current.searchSongs('周杰伦'),
         /阅读并确认免责声明/
       )
+      for (const method of [
+        'fetchArtistTopSongs',
+        'fetchArtistAlbums',
+        'fetchArtistIntro',
+        'fetchAlbumTracks'
+      ]) {
+        assert.equal(typeof harness.provider.current[method], 'function')
+        await assert.rejects(() => harness.provider.current[method]('3520'), /阅读并确认免责声明/)
+      }
       assert.equal(calls, 0)
       const form = await harness.handlers.get(SETTINGS_COMMAND)({
         source: 'settingsPanel',
@@ -230,6 +239,7 @@ test('maps public song search results without sending private credentials', asyn
         bpm: undefined,
         providerSongId: 'ABCD1234',
         providerAlbumId: '321',
+        albumId: '321',
         providerAlbumAudioId: '654'
       })
       assert.equal(harness.values.has('device'), false)
@@ -301,7 +311,8 @@ test('searches public playlists and artists without starting the authenticated s
           {
             id: '456',
             name: '华语歌手',
-            cover: 'https://img.example/400.jpg'
+            cover: 'https://img.example/400.jpg',
+            picUrl: 'https://img.example/400.jpg'
           }
         ],
         total: 1
@@ -789,7 +800,7 @@ test('maps playlist/track/all rows that carry singerinfo, timelen and albuminfo 
       id: 'kugou:3F47A55D28D26E9D39434E14EFE77338',
       title: '少女手册',
       artist: '华语群星/客座歌手',
-      artists: [{ name: '华语群星' }, { name: '客座歌手' }],
+      artists: [{ name: '华语群星', id: '283307' }, { name: '客座歌手' }],
       album: '菲梦少女',
       filePath: 'kugou:3F47A55D28D26E9D39434E14EFE77338',
       fileName: '少女手册.mp3',
@@ -1053,6 +1064,160 @@ test('discovery bounds upstream appended playlists to the requested page size', 
       assert.equal(result.items.length, 12)
       assert.equal(result.total, 0)
       assert.equal(result.hasMore, true)
+    }
+  )
+})
+
+test('artist details map modern nested audio and structured multi-artist identities without login', async () => {
+  const harness = await startPlugin({ consent: { disclaimerVersion: CONSENT_VERSION } })
+  await withFetch(
+    async (input, options) => {
+      const url = new URL(input)
+      assert.equal(url.searchParams.get('id'), '3520')
+      assert.equal(url.searchParams.has('token'), false)
+      assert.equal(options.signal.aborted, false)
+      if (url.pathname === '/artist/detail')
+        return jsonResponse({ error_code: 0, data: { intro: ' 歌手简介 ' } })
+      assert.equal(url.pathname, '/artist/audios/new')
+      assert.equal(url.searchParams.get('sort'), 'hot')
+      assert.equal(url.searchParams.get('pagesize'), '50')
+      return jsonResponse({
+        error_code: 0,
+        data: {
+          total: 200,
+          songs: [
+            {},
+            {
+              audio_name: '热门歌曲',
+              author_name: '主唱/合唱歌手',
+              album_id: 958909,
+              album_audio_id: 32029513,
+              authors: [
+                { base: { author_id: 3520, author_name: '主唱' } },
+                { base: { author_id: 42, author_name: '合唱歌手' } }
+              ],
+              audio_info: { hash: 'abcd', timelength: 299284, filesize: 4789176 },
+              album_info: { album_name: '测试专辑', cover: 'https://img.example/{size}.jpg' }
+            }
+          ]
+        }
+      })
+    },
+    async () => {
+      const [songs, intro] = await Promise.all([
+        harness.provider.current.fetchArtistTopSongs(3520),
+        harness.provider.current.fetchArtistIntro('3520')
+      ])
+      assert.equal(songs.length, 1)
+      assert.equal(songs[0].id, 'kugou:ABCD')
+      assert.equal(songs[0].title, '热门歌曲')
+      assert.equal(songs[0].duration, 299)
+      assert.equal(songs[0].size, 4789176)
+      assert.equal(songs[0].cover, 'https://img.example/400.jpg')
+      assert.equal(songs[0].albumId, '958909')
+      assert.equal(songs[0].providerAlbumId, '958909')
+      assert.equal(songs[0].providerAlbumAudioId, '32029513')
+      assert.deepEqual(songs[0].artists, [
+        { name: '主唱', id: '3520' },
+        { name: '合唱歌手', id: '42' }
+      ])
+      assert.equal(intro, '歌手简介')
+      assert.equal(harness.values.has('auth'), false)
+      assert.equal(harness.vendor.calls.create, 1)
+    }
+  )
+})
+
+test('artist albums and nested album tracks read every page using raw upstream counts', async () => {
+  const harness = await startPlugin({ consent: { disclaimerVersion: CONSENT_VERSION } })
+  const pages = []
+  await withFetch(
+    async (input) => {
+      const url = new URL(input)
+      const page = Number(url.searchParams.get('page'))
+      const albums = url.pathname === '/artist/albums'
+      assert.ok(albums || url.pathname === '/album/songs')
+      assert.equal(url.searchParams.get('id'), albums ? '3520' : '123')
+      assert.equal(url.searchParams.get('pagesize'), '50')
+      if (albums) assert.equal(url.searchParams.get('sort'), 'new')
+      pages.push([url.pathname, page])
+      const row = (i) =>
+        albums
+          ? {
+              album_id: 100 + i,
+              album_name: `专辑 ${i}`,
+              author_name: '周杰伦',
+              sizable_cover: 'https://img.example/{size}.jpg',
+              publish_date: '2003-07-31',
+              type: '录音室专辑'
+            }
+          : {
+              base: {
+                album_id: 123,
+                album_audio_id: 9000 + i,
+                audio_name: `歌曲 ${i}`,
+                author_name: '周杰伦'
+              },
+              authors: [{ author_id: 3520, author_name: '周杰伦' }],
+              audio_info: { hash_128: `hash${i}`, duration_128: 180000, filesize_128: 4000 },
+              album_info: { album_name: '专辑', cover: 'https://img.example/{size}.jpg' }
+            }
+      const batch =
+        page === 1 ? Array.from({ length: 50 }, (_, i) => (i === 0 ? {} : row(i))) : [row(50)]
+      return jsonResponse({
+        error_code: 0,
+        total: 51,
+        data: albums ? batch : { total: 51, songs: batch }
+      })
+    },
+    async () => {
+      const albums = await harness.provider.current.fetchArtistAlbums('3520')
+      assert.equal(albums.length, 50)
+      assert.equal(albums.at(-1).id, '150')
+      assert.equal(albums[0].name, '专辑 1')
+      assert.equal(albums[0].cover, 'https://img.example/400.jpg')
+      assert.equal(albums[0].publishTime, Date.parse('2003-07-31'))
+      const tracks = await harness.provider.current.fetchAlbumTracks('123')
+      assert.equal(tracks.length, 50)
+      assert.equal(tracks.at(-1).title, '歌曲 50')
+      assert.equal(tracks.at(-1).providerAlbumAudioId, '9050')
+      assert.equal(tracks[0].albumId, '123')
+      assert.equal(tracks[0].duration, 180)
+      assert.deepEqual(tracks[0].artists, [{ name: '周杰伦', id: '3520' }])
+      assert.deepEqual(pages, [
+        ['/artist/albums', 1],
+        ['/artist/albums', 2],
+        ['/album/songs', 1],
+        ['/album/songs', 2]
+      ])
+    }
+  )
+})
+
+test('artist and album request failures and cancellation remain visible to the host', async () => {
+  const harness = await startPlugin({ consent: { disclaimerVersion: CONSENT_VERSION } })
+  const controller = new AbortController()
+  controller.abort(new Error('artist request cancelled'))
+  await withFetch(
+    async () => jsonResponse({ error_code: 20010, msg: '歌手请求失败' }),
+    async () => {
+      for (const method of [
+        'fetchArtistTopSongs',
+        'fetchArtistAlbums',
+        'fetchArtistIntro',
+        'fetchAlbumTracks'
+      ]) {
+        await assert.rejects(() => harness.provider.current[method]('3520'), /歌手请求失败/)
+        await assert.rejects(
+          () => harness.provider.current[method]('3520', { signal: controller.signal }),
+          /artist request cancelled/
+        )
+      }
+      await assert.rejects(
+        () => harness.provider.current.fetchArtistTopSongs('bad/id'),
+        /歌手 ID 无效/
+      )
+      await assert.rejects(() => harness.provider.current.fetchAlbumTracks(''), /专辑 ID 无效/)
     }
   )
 })

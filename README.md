@@ -63,8 +63,8 @@ plugins/
     THIRD_PARTY_NOTICES.md
 packages/
   com.twilightecho.provider.bilibili-0.1.13.tep
-  com.twilightecho.provider.qqmusic-0.3.2.tep
-  com.twilightecho.provider.kugou-0.2.3.tep
+  com.twilightecho.provider.qqmusic-0.4.4.tep
+  com.twilightecho.provider.kugou-0.4.2.tep
   com.twilightecho.provider.ytmusic-1.0.5.tep
   com.twilightecho.provider.navidrome-1.0.0.tep
 catalog/                   # reviewed independent plugins, one JSON file per plugin
@@ -131,8 +131,8 @@ Plugin id: `com.twilightecho.provider.qqmusic`
 
 Provider id: `qq`
 
-Search and play QQ Music tracks with homepage recommendations, discovery
-playlists, lyrics, QR login, user playlists and a local Range-capable stream
+Search and play QQ Music tracks with artist pages, albums, homepage recommendations,
+discovery playlists, lyrics, official website login on supported desktop hosts, user playlists and a local Range-capable stream
 proxy. Public catalogue requests follow Rain120/qq-music-api. The plugin
 requires an explicit disclaimer acknowledgement before it makes upstream requests. See
 `plugins/qqmusic-provider/README.md` for details.
@@ -143,7 +143,8 @@ Plugin id: `com.twilightecho.provider.kugou`
 
 Provider id: `kugou`
 
-Search public KuGou Music tracks, artists and playlists, resolve KRC lyrics,
+Search public KuGou Music tracks, artists and playlists, browse artist pages and
+albums, resolve KRC lyrics,
 scan a user library after QR login and relay audio through a local Range-capable
 stream proxy. It embeds a loopback-only KuGouMusicApi-compatible service and
 also accepts an explicitly configured user-run loopback service, never a public
@@ -211,11 +212,11 @@ This creates `packages/com.twilightecho.provider.navidrome-1.0.0.tep` and refres
 - `plugins.json`
 
 `pnpm run pack:qqmusic` creates or updates
-`packages/com.twilightecho.provider.qqmusic-0.3.2.tep` and then refreshes
+`packages/com.twilightecho.provider.qqmusic-0.4.4.tep` and then refreshes
 `plugins.json`.
 
 `pnpm run pack:kugou` creates or updates
-`packages/com.twilightecho.provider.kugou-0.2.3.tep` and then refreshes
+`packages/com.twilightecho.provider.kugou-0.4.2.tep` and then refreshes
 `plugins.json`.
 
 The generated package intentionally includes only runtime files such as
@@ -365,8 +366,8 @@ You can host the same files on any HTTPS server:
 ```text
 https://plugins.example.com/twilight/plugins.json
 https://plugins.example.com/twilight/packages/com.twilightecho.provider.bilibili-0.1.13.tep
-https://plugins.example.com/twilight/packages/com.twilightecho.provider.qqmusic-0.3.2.tep
-https://plugins.example.com/twilight/packages/com.twilightecho.provider.kugou-0.2.3.tep
+https://plugins.example.com/twilight/packages/com.twilightecho.provider.qqmusic-0.4.4.tep
+https://plugins.example.com/twilight/packages/com.twilightecho.provider.kugou-0.4.2.tep
 ```
 
 Then point Twilight Echo at your server:
