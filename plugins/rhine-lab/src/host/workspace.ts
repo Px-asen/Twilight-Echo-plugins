@@ -235,7 +235,17 @@ async function renderQueue(root: HTMLElement) {
     ),
   );
   if (!queue.length) {
-    controls.append(document.createTextNode("队列为空，请从专辑中选择歌曲。"));
+    const playLibrary = (shuffle: boolean) =>
+      window.dispatchEvent(
+        new CustomEvent("rhine-play-library", { detail: { shuffle } }),
+      );
+    controls.append(
+      document.createTextNode(
+        "队列为空。可以从专辑中选歌，也可以直接播放整个音乐库：",
+      ),
+      button("随机播放全部", () => playLibrary(true)),
+      button("顺序播放全部", () => playLibrary(false)),
+    );
     return;
   }
   const list = document.createElement("div");
@@ -1192,8 +1202,13 @@ onHost("player", (state) => {
   player = state;
   updateClock();
 });
+// Track changes revise the queue in bursts; render once they settle.
+let queueRender: ReturnType<typeof setTimeout> | undefined;
 onHost("queue", () => {
-  if (dialog.open && active === "queue") void activate("queue", true);
+  clearTimeout(queueRender);
+  queueRender = setTimeout(() => {
+    if (dialog.open && active === "queue") void activate("queue", true);
+  }, 250);
 });
 const themeObserver = new MutationObserver(() =>
   window.parent.postMessage(

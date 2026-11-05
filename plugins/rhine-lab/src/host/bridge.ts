@@ -22,19 +22,54 @@ export function onHost(event: string, callback: (value: any) => void) {
     callbacks.delete(callback);
   };
 }
+// Twilight Echo answers at most 16 requests per experience at a time and
+// rejects the rest with "Too many requests". Keep a margin and queue the excess
+// here, in call order; the timeout starts once a request is actually sent.
+const maxInFlight = 12;
+const waiting: (() => void)[] = [];
+let inFlight = 0;
+function sendWaiting() {
+  while (inFlight < maxInFlight && waiting.length) waiting.shift()!();
+}
 export function callHost<T = any>(
   method: string,
   args: Record<string, unknown> = {},
 ): Promise<T> {
   if (!port) return Promise.reject(new Error("Twilight Echo 尚未连接"));
-  const id = ++serial;
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pending.delete(id);
-      reject(new Error(`操作超时：${method}`));
-    }, 30000);
-    pending.set(id, { resolve, reject, timer });
-    port!.postMessage({ id, method, args });
+    waiting.push(() => {
+      if (!port) {
+        reject(new Error("Twilight Echo 尚未连接"));
+        return;
+      }
+      inFlight++;
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        inFlight--;
+        queueMicrotask(sendWaiting);
+      };
+      const id = ++serial;
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        release();
+        reject(new Error(`操作超时：${method}`));
+      }, 30000);
+      pending.set(id, {
+        resolve: (value) => {
+          release();
+          resolve(value);
+        },
+        reject: (error) => {
+          release();
+          reject(error);
+        },
+        timer,
+      });
+      port.postMessage({ id, method, args });
+    });
+    sendWaiting();
   });
 }
 export async function connectHost() {

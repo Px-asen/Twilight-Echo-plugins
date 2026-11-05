@@ -1,6 +1,7 @@
 # 莱茵生命 · 音乐档案馆
 
-Twilight Echo 的完整界面插件预览版 0.2.14，基于 RonaldDeng/Rhine-Music-Demo V0.5.0（a889801f）。
+Twilight Echo 的完整界面插件预览版 0.2.15，基于 RonaldDeng/Rhine-Music-Demo V0.5.0（a889801f）。
+0.2.15 在播放区加入“随机播放全部”（播放键左侧）和“下一首”（播放键与停止键之间）；工作台队列为空时，可随机或按专辑架顺序播放整个音乐库（跳过离线专辑，一次最多 5000 首）。切到另一张专辑的歌曲时，仍停在上一张专辑的音乐架或详情会跟到新专辑并高亮新歌，歌词页关闭后返回新专辑；正在浏览其他专辑时不移动。与宿主的请求最多同时发出 12 个，队列刷新合并处理，宿主队列改版时自动重读，修复 Twilight Echo 2.0 下的“Too many requests”和“Library queue changed concurrently”提示。
 0.2.14 对照下载的 0.2.9 检查面板与相同画质的性能。画质预设明确区分“原画质优化版”（默认）和“低需求性能版”；低需求档会降低清晰度、远处模型与光影细节，功能面板完整，帧率独立设置。本次还恢复 360° 查看器的原版 MSAA。同画质静止场景 GPU 每帧开销减少约 32–35%，持续动效约 0–5%；不能直接等同任务管理器占用降幅。条件、差异和内存边界见 docs/COMPARISON_0.2.14.md。
 0.2.13 对照下载的 0.2.9 恢复原始画质：1.5× 像素密度上限、完整模型及原有接触阴影；FXAA 和自动分级改为手动性能选项。升级修复此前完整匹配的低清默认配置，保留自定义选择与帧率。对比与验证见 docs/PERFORMANCE_0.2.13.md。
 0.2.12 进一步减少层叠玻璃的重复着色，封面图集按需分配，AO 改用单通道存储，并增加低开销 FXAA。默认保持 60 FPS；性能与内存验证见 docs/PERFORMANCE_0.2.12.md。
@@ -32,7 +33,7 @@ Twilight Echo 的完整界面插件预览版 0.2.14，基于 RonaldDeng/Rhine-Mu
 - 维护者：Px-asen（Twilight Echo）；上游 Rhine Music 由 RonaldDeng 维护。
 - 反馈入口：[Twilight-Echo-plugins Issues](https://github.com/Px-asen/Twilight-Echo-plugins/issues)。
 - 运行平台：随 Twilight Echo 宿主运行，当前在 Windows 10/11 验证；macOS 与 Linux 宿主尚未验证。
-- 上游与版本：基于 [RonaldDeng/Rhine-Music-Demo](https://github.com/RonaldDeng/Rhine-Music-Demo) V0.5.0（`a889801f`），加载开场另参考 [LBEILC/RhineLabUI](https://github.com/LBEILC/RhineLabUI)（`12cc5e40`）。插件使用独立版本号（当前 0.2.14），由本仓库维护；上游作者未参与本插件的开发，也不为其提供支持或背书。
+- 上游与版本：基于 [RonaldDeng/Rhine-Music-Demo](https://github.com/RonaldDeng/Rhine-Music-Demo) V0.5.0（`a889801f`），加载开场另参考 [LBEILC/RhineLabUI](https://github.com/LBEILC/RhineLabUI)（`12cc5e40`）。插件使用独立版本号（当前 0.2.15），由本仓库维护；上游作者未参与本插件的开发，也不为其提供支持或背书。
 
 源码及资源来源见 UPSTREAM.json、UPSTREAM_README.md、NOTICE.md 和 LICENSE。
 歌词实现、许可与实测记录见 docs/LYRICS-0.2.8.md；`npm run check:lyrics` 运行解析／时钟及隔离宿主界面测试（沿用项目浏览器测试环境）。
