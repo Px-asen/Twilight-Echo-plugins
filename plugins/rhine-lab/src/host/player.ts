@@ -22,6 +22,8 @@ export class TwilightMusicPlayer {
   private bgmTarget = 0;
   private bgmTask: Promise<void> = Promise.resolve();
   private fade?: Fade;
+  private queueTask?: Promise<void>;
+  private queueDirty = false;
   constructor(
     options: {
       volume?: number;
@@ -125,12 +127,42 @@ export class TwilightMusicPlayer {
       }
     }
   }
-  private async refreshQueue() {
-    const queue = await callHost<MusicTrack[]>("player.queue");
-    if (!this.disposed) {
-      this.value.queue = queue;
-      this.emit();
+  /**
+   * The host revises its queue on every track change and can send several
+   * notices at once. Read one at a time; notices that arrive meanwhile are
+   * folded into one more read. A read that overlaps a revision is retried.
+   */
+  private refreshQueue(): Promise<void> {
+    if (this.queueTask) {
+      // The running read reports its own errors.
+      this.queueDirty = true;
+      return Promise.resolve();
     }
+    this.queueTask = (async () => {
+      let retries = 0;
+      try {
+        do {
+          this.queueDirty = false;
+          try {
+            const queue = await callHost<MusicTrack[]>("player.queue");
+            if (!this.disposed) {
+              this.value.queue = queue;
+              this.emit();
+            }
+          } catch (error) {
+            const stale = /changed concurrently|refresh its revision/i.test(
+              String(error),
+            );
+            if (!stale || ++retries > 3) throw error;
+            this.queueDirty = true;
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
+        } while (this.queueDirty && !this.disposed);
+      } finally {
+        this.queueTask = undefined;
+      }
+    })();
+    return this.queueTask;
   }
   async refreshOutputs(): Promise<AudioCapabilities> {
     const audio = await callHost("audio.read");

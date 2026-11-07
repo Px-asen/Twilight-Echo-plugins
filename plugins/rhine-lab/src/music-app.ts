@@ -56,6 +56,7 @@ import type {
   MusicAlbum,
   MusicGenre,
   MusicLibrary,
+  MusicTrack,
   GenreRules,
 } from "./music-types";
 import { demoAlbums, demoGenres } from "./demo-library";
@@ -67,6 +68,11 @@ import { setupMusicTicks } from "./music-ticks";
 import { setupMusicRuler } from "./music-ruler";
 import { MusicPresentation, type AlbumSelection } from "./music-presentation";
 import { MusicTrackFocus } from "./music-track-focus";
+import {
+  PlayingAlbumTracker,
+  playbackFollowAction,
+  type PlaybackFollowView,
+} from "./music-playback-follow";
 import { musicArtistKey } from "./music-order";
 import { MusicBoot } from "./music-boot";
 import { loadingOpening } from "./loading-opening";
@@ -101,6 +107,8 @@ const icons = {
   play: svg('<path d="m9 5 11 7-11 7Z" fill="currentColor" stroke="none"/>'),
   pause: svg('<path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" stroke="none"/>'),
   stop: svg('<rect x="6" y="6" width="12" height="12" rx="1"/>'),
+  next: svg('<path d="m6 5 10 7-10 7Z" fill="currentColor" stroke="none"/><path d="M18.5 5v14"/>'),
+  shuffle: svg('<path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>'),
   search: svg(
     '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/>',
   ),
@@ -321,7 +329,8 @@ stage.innerHTML = `
         <button type="button" data-action="locate-playing" id="transport-track" class="transport-track" aria-label="定位当前歌曲" aria-hidden="true" disabled><span id="transport-track-label"></span></button>
         <button type="button" data-action="lyrics" id="open-lyrics" aria-label="打开歌词" title="音频档案 · 歌词">${svg('<path d="M8 5h13M8 12h13M8 19h8M3 5h.01M3 12h.01M3 19h.01"/>')}</button>
         <button type="button" data-action="song-transition" id="song-transition-toggle" data-transition="${preferences.songTransition}" aria-label="歌曲衔接" ${preferences.showSongTransitionControl ? "" : "hidden"}>${Object.entries(songTransitionIcons).map(([transition, icon]) => `<span class="song-transition-glyph" data-transition="${transition}" aria-hidden="true">${icon}</span>`).join("")}</button>
-        <button data-action="play-pause" id="play-pause" aria-label="播放" aria-pressed="false"><span class="transport-glyph transport-play" aria-hidden="true">${icons.play}</span><span class="transport-glyph transport-pause" aria-hidden="true">${icons.pause}</span></button><button data-action="stop" id="stop-playback" aria-label="停止">${icons.stop}</button>
+        <button type="button" data-action="shuffle-all" id="shuffle-all" aria-label="随机播放全部" title="随机播放全部">${icons.shuffle}</button>
+        <button data-action="play-pause" id="play-pause" aria-label="播放" aria-pressed="false"><span class="transport-glyph transport-play" aria-hidden="true">${icons.play}</span><span class="transport-glyph transport-pause" aria-hidden="true">${icons.pause}</span></button><button type="button" data-action="next-track" id="next-track" aria-label="下一首" title="下一首">${icons.next}</button><button data-action="stop" id="stop-playback" aria-label="停止">${icons.stop}</button>
       </div>
     </nav>
   </header>
@@ -1740,6 +1749,69 @@ player.subscribe((state) => {
   syncAudioOutputUI();
 });
 
+// Follow playback into the next album; see music-playback-follow.ts.
+const playingAlbum = new PlayingAlbumTracker();
+let followTimer: ReturnType<typeof setInterval> | undefined;
+function followView(): PlaybackFollowView {
+  const interactive = ready && !boot?.active && !panel && !lyricsRestoring && !libraryRebuilding;
+  return {
+    interactive,
+    shelfIdle: interactive && !lyricsOpen && !overview && presentation.phase === "archive" &&
+      !presentation.pendingSelection,
+    lyricsOpen,
+    openingOrDetail: presentation.openingOrDetail,
+    shownAlbumId: currentAlbum()?.id,
+  };
+}
+function followOnShelf(track: MusicTrack) {
+  if (currentAlbum()?.id === track.albumId) return;
+  const index = records.findIndex((record) => record.id === track.albumId);
+  if (index >= 0) select(index, undefined, false, "archive");
+}
+function cancelDeferredFollow() {
+  clearInterval(followTimer);
+  followTimer = undefined;
+}
+/** Wait out a panel, the overview or a transition, unless an album opens. */
+function deferFollow() {
+  if (followTimer) return;
+  followTimer = setInterval(() => {
+    const track = playerState.currentTrack;
+    const view = followView();
+    if (!track || view.lyricsOpen || view.openingOrDetail) cancelDeferredFollow();
+    else if (view.shelfIdle) {
+      cancelDeferredFollow();
+      followOnShelf(track);
+    }
+  }, 500);
+}
+player.subscribe((state) => {
+  const track = state.currentTrack;
+  const change = playingAlbum.observe(track);
+  if (!track || !change) return;
+  cancelDeferredFollow();
+  const { previousAlbumId } = change;
+  switch (playbackFollowAction(followView(), previousAlbumId)) {
+    case "lyrics":
+      if (lyricsOrigin && (!lyricsOrigin.detail || lyricsOrigin.albumId === previousAlbumId))
+        lyricsOrigin.albumId = track.albumId;
+      break;
+    case "shelf":
+      followOnShelf(track);
+      break;
+    case "detail": {
+      const index = records.findIndex((record) => record.id === track.albumId);
+      if (index < 0) break;
+      select(index, undefined, true);
+      pendingTrackReveal = { albumId: track.albumId, trackId: track.id };
+      break;
+    }
+    case "defer":
+      deferFollow();
+      break;
+  }
+});
+
 function audioOutputMarkup() {
   return `<section class="panel-section"><h3>音频输出</h3><label class="settings-row"><span>输出方式<small>选择歌曲使用的输出方式</small></span><select id="audio-backend" aria-label="音频输出方式">${isHosted ? '<option value="twilight">Twilight Echo 音频引擎</option>' : '<option value="browser">浏览器输出</option><option value="coreaudio">Mac 原生 CoreAudio</option>'}</select></label><label class="settings-row" id="audio-device-row"><span>输出设备<small>仅改变本播放器的歌曲输出</small></span><select id="audio-device" aria-label="音频输出设备"></select></label><p id="audio-output-status" role="status"></p><button class="text-button" data-action="refresh-output">刷新输出设备 ↻</button><p>APE、FLAC、WAV 等格式在本机解码；DSF / DFF 在本机转为 PCM 播放，源文件保持不变。原生输出直接连接所选设备；浏览器输出沿用浏览器的声音设备。</p></section>`;
 }
@@ -2173,6 +2245,34 @@ function playAlbum(id?: string) {
   if (!a?.tracks.length || a.offline) return;
   void player.play(id || a.tracks[0].id, a.tracks);
 }
+// Twilight Echo limits one request to 256 KB, which bounds the ids per call.
+const libraryPlayLimit = 5000;
+/** Queue every playable album, in shelf order or shuffled. */
+function playLibrary(shuffle: boolean) {
+  if (demo) {
+    notify("现在显示的是演示封面，请先设置音乐文件夹。");
+    return;
+  }
+  const tracks = albums.filter((album) => !album.offline).flatMap((album) => album.tracks);
+  if (!tracks.length) {
+    notify("音乐库里还没有可以播放的歌曲。");
+    return;
+  }
+  if (shuffle) {
+    for (let i = tracks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+    }
+  }
+  const queue = tracks.slice(0, libraryPlayLimit);
+  void player.play(queue[0].id, queue);
+  const count = queue.length < tracks.length
+    ? `共 ${tracks.length} 首，本次加入 ${queue.length} 首`
+    : `${queue.length} 首`;
+  notify(`${shuffle ? "随机" : "顺序"}播放全部：${count}`);
+}
+window.addEventListener("rhine-play-library", ((event: CustomEvent<{ shuffle?: boolean }>) =>
+  playLibrary(event.detail?.shuffle === true)) as EventListener);
 
 document.addEventListener("click", (e) => {
   if (boot?.active) return;
@@ -2339,6 +2439,13 @@ document.addEventListener("click", (e) => {
       break;
     case "stop":
       player.stop();
+      break;
+    case "next-track":
+      if (playerState.currentTrack) void player.next();
+      else notify("还没有正在播放的歌曲。");
+      break;
+    case "shuffle-all":
+      playLibrary(true);
       break;
     case "scan":
       void scan(true);
