@@ -21,21 +21,6 @@
   },
   "plugins": [
     {
-      "id": "com.github.iris-sci.playlist-bridge",
-      "version": "2.0.1",
-      "repository": "https://github.com/IRIS-SCI/twilight-playlist-bridge",
-      "sourceUrl": "https://github.com/IRIS-SCI/twilight-playlist-bridge/releases/download/v2.0.1/com.github.iris-sci.playlist-bridge-2.0.1.tep",
-      "checksumSha256": "1e0093715eba4565ebea4f35189e9f05a8fa8b72c5c03612397b626c9adc2cff",
-      "tags": [
-        "ui",
-        "foobar2000",
-        "m3u8",
-        "playlist",
-        "twilight-echo",
-        "community"
-      ]
-    },
-    {
       "id": "com.sh1rotr1.powerpulse",
       "version": "0.2.0",
       "repository": "https://github.com/Sh1rotr1/twilight-echo-powerpulse",
