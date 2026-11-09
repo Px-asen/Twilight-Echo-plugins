@@ -6,10 +6,6 @@
     "com.sh1rotr1.powerpulse": "https://github.com/Sh1rotr1/twilight-echo-powerpulse"
   },
   "history": {
-    "com.github.iris-sci.playlist-bridge": {
-      "version": "2.0.1",
-      "checksumSha256": "1e0093715eba4565ebea4f35189e9f05a8fa8b72c5c03612397b626c9adc2cff"
-    },
     "com.sh1rotr1.powerpulse": {
       "version": "0.2.0",
       "checksumSha256": "deeb77c165d5ba91a3dcff366630b0c9b11b2e6304a3ac996f39b444b49a4ae5"
@@ -17,9 +13,28 @@
     "com.twilightecho.tool.wallpaper-engine": {
       "version": "2.1.3",
       "checksumSha256": "473f9e97033dd0b7150b39715fcdfdfc9fa571211f6ab7ebd9837db9e0ed8e5e"
+    },
+    "com.github.iris-sci.playlist-bridge": {
+      "version": "2.0.1",
+      "checksumSha256": "1e0093715eba4565ebea4f35189e9f05a8fa8b72c5c03612397b626c9adc2cff"
     }
   },
   "plugins": [
+    {
+      "id": "com.github.iris-sci.playlist-bridge",
+      "version": "2.0.1",
+      "repository": "https://github.com/IRIS-SCI/twilight-playlist-bridge",
+      "sourceUrl": "https://github.com/IRIS-SCI/twilight-playlist-bridge/releases/download/v2.0.1/com.github.iris-sci.playlist-bridge-2.0.1.tep",
+      "checksumSha256": "1e0093715eba4565ebea4f35189e9f05a8fa8b72c5c03612397b626c9adc2cff",
+      "tags": [
+        "ui",
+        "foobar2000",
+        "m3u8",
+        "playlist",
+        "twilight-echo",
+        "community"
+      ]
+    },
     {
       "id": "com.sh1rotr1.powerpulse",
       "version": "0.2.0",
