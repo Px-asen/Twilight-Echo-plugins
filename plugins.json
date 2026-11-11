@@ -1444,7 +1444,7 @@
     {
       "id": "com.twilightecho.tool.wallpaper-engine",
       "name": "Wallpaper Engine 动态背景",
-      "version": "2.4.1",
+      "version": "2.4.2",
       "description": "在外观页选择本机 Wallpaper Engine 壁纸、画质与填充；视频/网页播放，场景由 WebWallGL 实时渲染，自动静音，网页可交互；读取壁纸属性并实时调整；支持定时与切页轮播。",
       "author": "Matsuki",
       "license": "MIT",
@@ -1464,8 +1464,8 @@
         "ui:inject"
       ],
       "repository": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine",
-      "sourceUrl": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine/releases/download/v2.4.1/com.twilightecho.tool.wallpaper-engine-2.4.1.tep",
-      "checksumSha256": "e398d247b6719d865a3373931d8d264773298367c3e64ffbedb454b345ac09e2",
+      "sourceUrl": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine/releases/download/v2.4.2/com.twilightecho.tool.wallpaper-engine-2.4.2.tep",
+      "checksumSha256": "2584ebdae3f21717b9fdc3e44949fdaa0e759f8096b11fbe070760fa90f39a10",
       "tags": [
         "tool",
         "ui",
