@@ -69,6 +69,43 @@
       "verified": false
     },
     {
+      "id": "com.mrwoods1692.provider.voicehub",
+      "name": "VoiceHub 音源",
+      "version": "0.3.0",
+      "description": "把自建 VoiceHub 点歌台的哔哩哔哩 / 咪咕 / QQ / 网易云音源接入 Twilight Echo：搜索、歌词，某个音源取不到播放链接时自动换源播放同一首歌。",
+      "author": "MrWoods1692",
+      "license": "MIT",
+      "icon": "icon.png",
+      "homepage": "https://github.com/MrWoods1692/te-plugin-voicehub",
+      "repository": "https://github.com/MrWoods1692/te-plugin-voicehub",
+      "type": [
+        "provider",
+        "ui"
+      ],
+      "main": "index.mjs",
+      "engines": {
+        "twilightEcho": ">=2.0.0"
+      },
+      "apiVersion": 1,
+      "permissions": [
+        "network",
+        "settings",
+        "ui:inject"
+      ],
+      "sourceUrl": "https://github.com/MrWoods1692/te-plugin-voicehub/releases/download/v0.3.0/com.mrwoods1692.provider.voicehub-0.3.0.tep",
+      "checksumSha256": "89ed2b9e214b3724333c7661d1e8cede50bd1912080ea2b1de871399064f28db",
+      "tags": [
+        "provider",
+        "ui",
+        "music-provider",
+        "plugin",
+        "twilight-echo",
+        "voicehub",
+        "community"
+      ],
+      "verified": false
+    },
+    {
       "id": "com.sh1rotr1.powerpulse",
       "name": "PowerPulse 设备电量",
       "version": "0.2.0",
