@@ -1,0 +1,16 @@
+{
+  "id": "com.mrwoods1692.provider.voicehub",
+  "version": "0.3.0",
+  "repository": "https://github.com/MrWoods1692/te-plugin-voicehub",
+  "sourceUrl": "https://github.com/MrWoods1692/te-plugin-voicehub/releases/download/v0.3.0/com.mrwoods1692.provider.voicehub-0.3.0.tep",
+  "checksumSha256": "89ed2b9e214b3724333c7661d1e8cede50bd1912080ea2b1de871399064f28db",
+  "tags": [
+    "provider",
+    "music-source",
+    "voicehub",
+    "bilibili",
+    "migu",
+    "qq-music",
+    "netease"
+  ]
+}
