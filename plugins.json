@@ -1481,7 +1481,7 @@
     {
       "id": "com.twilightecho.tool.wallpaper-engine",
       "name": "Wallpaper Engine 动态背景",
-      "version": "3.0.1",
+      "version": "3.0.2",
       "description": "适配 Twilight Echo 2.0.2 官方渲染桥（v5，不修改本体）：在外观页选择本机 Wallpaper Engine 壁纸与画质/填充/暗化/缩放，视频/网页播放，场景由 WebWallGL 实时渲染，自动静音，网页可交互；读取壁纸属性并实时调整。",
       "author": "Matsuki",
       "license": "MIT",
@@ -1501,8 +1501,8 @@
         "ui:inject"
       ],
       "repository": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine",
-      "sourceUrl": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine/releases/download/v3.0.1/com.twilightecho.tool.wallpaper-engine-3.0.1.tep",
-      "checksumSha256": "a2e1513afd4f7d62682196f517d33dd6d36c360bb7cf3e54eacf86afad796577",
+      "sourceUrl": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine/releases/download/v3.0.2/com.twilightecho.tool.wallpaper-engine-3.0.2.tep",
+      "checksumSha256": "2eedf852fac6d301ef1aad7c687c4476dcfdfcc2bc41d0ac5129f70f3ba225a7",
       "tags": [
         "tool",
         "ui",

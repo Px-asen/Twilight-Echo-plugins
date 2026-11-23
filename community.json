@@ -20,8 +20,8 @@
       "checksumSha256": "deeb77c165d5ba91a3dcff366630b0c9b11b2e6304a3ac996f39b444b49a4ae5"
     },
     "com.twilightecho.tool.wallpaper-engine": {
-      "version": "3.0.1",
-      "checksumSha256": "a2e1513afd4f7d62682196f517d33dd6d36c360bb7cf3e54eacf86afad796577"
+      "version": "3.0.2",
+      "checksumSha256": "2eedf852fac6d301ef1aad7c687c4476dcfdfcc2bc41d0ac5129f70f3ba225a7"
     }
   },
   "plugins": [
@@ -70,10 +70,10 @@
     },
     {
       "id": "com.twilightecho.tool.wallpaper-engine",
-      "version": "3.0.1",
+      "version": "3.0.2",
       "repository": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine",
-      "sourceUrl": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine/releases/download/v3.0.1/com.twilightecho.tool.wallpaper-engine-3.0.1.tep",
-      "checksumSha256": "a2e1513afd4f7d62682196f517d33dd6d36c360bb7cf3e54eacf86afad796577",
+      "sourceUrl": "https://github.com/Sh1rotr1/twilight-echo-wallpaper-engine/releases/download/v3.0.2/com.twilightecho.tool.wallpaper-engine-3.0.2.tep",
+      "checksumSha256": "2eedf852fac6d301ef1aad7c687c4476dcfdfcc2bc41d0ac5129f70f3ba225a7",
       "tags": [
         "tool",
         "ui",
